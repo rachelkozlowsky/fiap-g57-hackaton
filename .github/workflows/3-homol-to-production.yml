@@ -1,0 +1,38 @@
+name: Auto PR Homol to Production
+
+on:
+  push:
+    branches:
+      - homol
+
+jobs:
+  create-pr-production:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: '0'
+
+      - name: Calculate Next Version
+        id: version
+        uses: anothrNick/github-tag-action@1.64.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DRY_RUN: true
+          DEFAULT_BUMP: patch
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.new_tag }}"
+          gh pr create \
+            --base main \
+            --head homol \
+            --title "Release-$VERSION: Homol to Main" \
+            --body "Automated PR for Production release." \
+            || echo "PR creation failed or PR already exists."

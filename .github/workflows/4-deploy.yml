@@ -1,0 +1,60 @@
+name: Deploy and Versioning
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy manually'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+
+jobs:
+  versioning:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      new_tag: ${{ steps.tagger.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: '0'
+
+      - name: Bump version and push tag
+        id: tagger
+        uses: anothrNick/github-tag-action@1.64.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DEFAULT_BUMP: patch
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ steps.tagger.outputs.new_tag }}"
+          echo "Criando Release no GitHub para a tag: $TAG_NAME"
+          
+          gh release create "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            --generate-notes \
+            --latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [versioning]
+    if: always() && (needs.versioning.result == 'success' || needs.versioning.result == 'skipped')
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to Production
+        run: |
+          echo "Iniciando deploy em PRODUÇÃO..."
+          VERSION="${{ needs.versioning.outputs.new_tag || github.ref_name }}"
+          echo "Versão: $VERSION"
+          echo "Deploy finalizado com sucesso."
