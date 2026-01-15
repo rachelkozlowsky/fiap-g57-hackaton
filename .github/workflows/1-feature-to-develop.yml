@@ -1,0 +1,26 @@
+name: Auto PR Feature to Develop
+
+on:
+  push:
+    branches:
+      - 'feature/*'
+
+jobs:
+  create-pr-develop:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base develop \
+            --head ${{ github.ref_name }} \
+            --title "Merge Feature: ${{ github.ref_name }} into Develop" \
+            --body "Automated PR created by GitHub Actions." \
+            || echo "PR creation failed or PR already exists."

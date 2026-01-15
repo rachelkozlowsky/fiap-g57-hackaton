@@ -1,0 +1,26 @@
+name: Auto PR Release to Homol
+
+on:
+  push:
+    branches:
+      - 'release-*'
+
+jobs:
+  create-pr-homol:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base homol \
+            --head ${{ github.ref_name }} \
+            --title "Release Candidate: ${{ github.ref_name }} to Homol" \
+            --body "Automated PR for Homol release from release branch." \
+            || echo "PR creation failed or PR already exists."
