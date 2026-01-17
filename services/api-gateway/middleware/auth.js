@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+// TODO: revisar 
+const JWT_SECRET = process.env.JWT_SECRET || '6f9e5ef5-ab0c-4bb4-a4f5-caefc64bc5d1';
 
 const authMiddleware = (req, res, next) => {
     try {
