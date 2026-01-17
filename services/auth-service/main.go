@@ -101,6 +101,13 @@ func setupRouter(db *database.Database, redis *database.RedisClient) *gin.Engine
 		}
 	}
 
+	internal := router.Group("/api/internal")
+	{
+		internalHandler := handlers.NewInternalHandler(db)
+		internal.GET("/users/:id", internalHandler.GetUserByID)
+		internal.GET("/users/email/:email", internalHandler.GetUserByEmail)
+	}
+
 	return router
 }
 
