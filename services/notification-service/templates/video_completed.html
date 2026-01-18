@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+        }
+
+        .header {
+            background-color: #6366f1;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 0.8em;
+            color: #777;
+            margin-top: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #6366f1;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Vídeo Processado! 🎬</h1>
+        </div>
+        <div class="content">
+            <p>Olá <strong>{{.UserName}}</strong>,</p>
+            <p>Seu vídeo <strong>{{.VideoName}}</strong> foi processado com sucesso.</p>
+            <ul>
+                <li><strong>Frames extraídos:</strong> {{.FrameCount}}</li>
+                <li><strong>Tamanho do arquivo:</strong> {{.ZipSize}}</li>
+                <li><strong>Tempo de processamento:</strong> {{.ProcessingTime}}</li>
+            </ul>
+            <p style="text-align: center; margin-top: 30px;">
+                <a href="{{.DownloadURL}}" class="button">Baixar Fotos (ZIP)</a>
+            </p>
+            <p>Ou copie e cole este link no seu navegador:</p>
+            <p style="font-size: 0.9em; word-break: break-all;">{{.DownloadURL}}</p>
+        </div>
+        <div class="footer">
+            <p>Este é um email automático do G57. Por favor, não responda.</p>
+        </div>
+    </div>
+</body>
+
+</html>
