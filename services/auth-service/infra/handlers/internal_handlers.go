@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 	"auth-service/domain"
 	"github.com/gin-gonic/gin"
 )
@@ -82,4 +83,38 @@ func (h *InternalHandler) GetUserByEmail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+type CreateAuditLogRequest struct {
+	UserID     *string `json:"user_id"`
+	Action     string  `json:"action"`
+	EntityType string  `json:"entity_type"`
+	EntityID   *string `json:"entity_id"`
+	IPAddress  string  `json:"ip_address"`
+	UserAgent  string  `json:"user_agent"`
+}
+
+func (h *InternalHandler) CreateAuditLog(c *gin.Context) {
+	var req CreateAuditLogRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	log := &domain.AuditLog{
+		UserID:     req.UserID,
+		Action:     req.Action,
+		EntityType: req.EntityType,
+		EntityID:   req.EntityID,
+		IPAddress:  req.IPAddress,
+		UserAgent:  req.UserAgent,
+		CreatedAt:  time.Now(),
+	}
+
+	if err := h.db.CreateAuditLog(log); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create audit log"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Audit log created"})
 }
