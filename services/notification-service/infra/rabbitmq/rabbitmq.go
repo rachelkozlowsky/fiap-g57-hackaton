@@ -1,0 +1,260 @@
+package rabbitmq
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+
+	"notification-service/infra/utils"
+
+	amqp "github.com/rabbitmq/amqp091-go"
+)
+
+type RabbitMQClient struct {
+	conn    *amqp.Connection
+	channel *amqp.Channel
+}
+
+type VideoProcessingMessage struct {
+	VideoID     string `json:"video_id"`
+	UserID      string `json:"user_id"`
+	StoragePath string `json:"storage_path"`
+	Filename    string `json:"filename"`
+	Priority    int    `json:"priority"`
+}
+
+type NotificationMessage struct {
+	UserID  string `json:"user_id"`
+	VideoID string `json:"video_id"`
+	Type    string `json:"type"`
+	Subject string `json:"subject"`
+	Message string `json:"message"`
+}
+
+func InitRabbitMQ() *RabbitMQClient {
+	url := utils.GetEnv("RABBITMQ_URL", "amqp://g57:g57123456@localhost:5672/")
+
+	conn, err := amqp.Dial(url)
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+
+	channel, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("Failed to open channel: %v", err)
+	}
+
+	err = channel.ExchangeDeclare(
+		"video.exchange",
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare exchange: %v", err)
+	}
+
+	err = channel.ExchangeDeclare(
+		"notification.exchange",
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare exchange: %v", err)
+	}
+
+	_, err = channel.QueueDeclare(
+		"video.upload.queue",
+		true,
+		false,
+		false,
+		false,
+		amqp.Table{
+			"x-max-priority": 10,
+			"x-message-ttl":  86400000,
+			"x-dead-letter-exchange": "video.dlx",
+			"x-dead-letter-routing-key": "video.upload.dlq",
+		},
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare queue: %v", err)
+	}
+
+	_, err = channel.QueueDeclare(
+		"notification.queue",
+		true,
+		false,
+		false,
+		false,
+		amqp.Table{
+			"x-message-ttl": 3600000,
+			"x-dead-letter-exchange": "notification.dlx",
+			"x-dead-letter-routing-key": "notification.dlq",
+		},
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare queue: %v", err)
+	}
+
+	err = channel.QueueBind(
+		"video.upload.queue",
+		"video.upload",
+		"video.exchange",
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to bind queue: %v", err)
+	}
+
+	err = channel.QueueBind(
+		"notification.queue",
+		"notification.#",
+		"notification.exchange",
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to bind queue: %v", err)
+	}
+
+	err = channel.Qos(
+		1,
+		0,
+		false,
+	)
+	if err != nil {
+		log.Fatalf("Failed to set QoS: %v", err)
+	}
+
+	log.Println("Connected to RabbitMQ")
+
+	return &RabbitMQClient{
+		conn:    conn,
+		channel: channel,
+	}
+}
+
+func (r *RabbitMQClient) Ping() error {
+	if r.conn.IsClosed() {
+		return fmt.Errorf("connection is closed")
+	}
+	return nil
+}
+
+func (r *RabbitMQClient) Close() error {
+	if r.channel != nil {
+		r.channel.Close()
+	}
+	if r.conn != nil {
+		return r.conn.Close()
+	}
+	return nil
+}
+
+func (r *RabbitMQClient) PublishVideoUpload(message VideoProcessingMessage) error {
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return r.channel.Publish(
+		"video.exchange",
+		"video.upload",
+		false,
+		false,
+		amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         body,
+			Priority:     uint8(message.Priority),
+		},
+	)
+}
+
+
+func (r *RabbitMQClient) ConsumeVideoUpload() (*VideoProcessingMessage, func(), func(), error) {
+	msgs, err := r.channel.Consume(
+		"video.upload.queue",
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	select {
+	case msg, ok := <-msgs:
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("channel closed")
+		}
+
+		var message VideoProcessingMessage
+		if err := json.Unmarshal(msg.Body, &message); err != nil {
+			msg.Nack(false, false)
+			return nil, nil, nil, err
+		}
+
+		ack := func() {
+			msg.Ack(false)
+		}
+
+		nack := func() {
+			msg.Nack(false, true)
+		}
+
+		return &message, ack, nack, nil
+	default:
+		return nil, nil, nil, nil
+	}
+}
+
+func (r *RabbitMQClient) PublishNotification(message NotificationMessage) error {
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return r.channel.Publish(
+		"notification.exchange",
+		"notification.email",
+		false,
+		false,
+		amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         body,
+		},
+	)
+}
+
+func (r *RabbitMQClient) SubscribeNotification() (<-chan amqp.Delivery, error) {
+	return r.channel.Consume(
+		"notification.queue",
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+}
+
+func (r *RabbitMQClient) GetQueueStats(queueName string) (int, error) {
+	queue, err := r.channel.QueueInspect(queueName)
+	if err != nil {
+		return 0, err
+	}
+	return queue.Messages, nil
+}
