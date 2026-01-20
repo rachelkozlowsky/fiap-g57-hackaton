@@ -12,122 +12,112 @@ import (
 type RabbitMQClient struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
+	url     string
 }
 
 func InitRabbitMQ() *RabbitMQClient {
 	url := utils.GetEnv("RABBITMQ_URL", "amqp://g57:g57123456@localhost:5672/")
+	client := &RabbitMQClient{url: url}
+	client.connect()
+	return client
+}
 
-	conn, err := amqp.Dial(url)
+func (r *RabbitMQClient) connect() {
+	var err error
+	r.conn, err = amqp.Dial(r.url)
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+		log.Printf("Failed to connect to RabbitMQ: %v", err)
+		return
 	}
 
-	channel, err := conn.Channel()
+	r.channel, err = r.conn.Channel()
 	if err != nil {
-		log.Fatalf("Failed to open channel: %v", err)
+		log.Printf("Failed to open channel: %v", err)
+		return
 	}
 
-	err = channel.ExchangeDeclare(
-		"video.exchange",
-		"topic",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
+	err = r.declareInfrastructure()
 	if err != nil {
-		log.Fatalf("Failed to declare exchange: %v", err)
+		log.Printf("Failed to declare infrastructure: %v", err)
 	}
 
-	err = channel.ExchangeDeclare(
-		"notification.exchange",
-		"topic",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
+	log.Println("Connected to RabbitMQ")
+}
+
+func (r *RabbitMQClient) declareInfrastructure() error {
+	err := r.channel.ExchangeDeclare("video.exchange", "topic", true, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("Failed to declare exchange: %v", err)
+		return fmt.Errorf("failed to declare video exchange: %v", err)
 	}
 
-	_, err = channel.QueueDeclare(
-		"video.upload.queue",
-		true,
-		false,
-		false,
-		false,
+	err = r.channel.ExchangeDeclare("notification.exchange", "topic", true, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("failed to declare notification exchange: %v", err)
+	}
+
+	_, err = r.channel.QueueDeclare("video.upload.queue", true, false, false, false,
 		amqp.Table{
 			"x-max-priority":            10,
 			"x-message-ttl":             86400000,
 			"x-dead-letter-exchange":    "video.dlx",
 			"x-dead-letter-routing-key": "video.upload.dlq",
-		},
-	)
+		})
 	if err != nil {
-		log.Fatalf("Failed to declare queue: %v", err)
+		return fmt.Errorf("failed to declare video queue: %v", err)
 	}
 
-	_, err = channel.QueueDeclare(
-		"notification.queue",
-		true,
-		false,
-		false,
-		false,
+	_, err = r.channel.QueueDeclare("notification.queue", true, false, false, false,
 		amqp.Table{
 			"x-message-ttl":             3600000,
 			"x-dead-letter-exchange":    "notification.dlx",
 			"x-dead-letter-routing-key": "notification.dlq",
-		},
-	)
+		})
 	if err != nil {
-		log.Fatalf("Failed to declare queue: %v", err)
+		return fmt.Errorf("failed to declare notification queue: %v", err)
 	}
 
-	err = channel.QueueBind(
-		"video.upload.queue",
-		"video.upload",
-		"video.exchange",
-		false,
-		nil,
-	)
+	err = r.channel.QueueBind("video.upload.queue", "video.upload", "video.exchange", false, nil)
 	if err != nil {
-		log.Fatalf("Failed to bind queue: %v", err)
+		return fmt.Errorf("failed to bind video queue: %v", err)
 	}
 
-	err = channel.QueueBind(
-		"notification.queue",
-		"notification.#",
-		"notification.exchange",
-		false,
-		nil,
-	)
+	err = r.channel.QueueBind("notification.queue", "notification.#", "notification.exchange", false, nil)
 	if err != nil {
-		log.Fatalf("Failed to bind queue: %v", err)
+		return fmt.Errorf("failed to bind notification queue: %v", err)
 	}
 
-	err = channel.Qos(
-		1,
-		0,
-		false,
-	)
+	err = r.channel.Qos(1, 0, false)
 	if err != nil {
-		log.Fatalf("Failed to set QoS: %v", err)
+		return fmt.Errorf("failed to set QoS: %v", err)
 	}
 
-	log.Println("Connected to RabbitMQ")
+	return nil
+}
 
-	return &RabbitMQClient{
-		conn:    conn,
-		channel: channel,
+func (r *RabbitMQClient) ensureConnection() error {
+	if r.conn == nil || r.conn.IsClosed() {
+		log.Println("RabbitMQ connection closed, reconnecting...")
+		r.connect()
 	}
+
+	if r.conn == nil || r.conn.IsClosed() {
+		return fmt.Errorf("failed to reconnect to RabbitMQ")
+	}
+
+	if r.channel == nil || r.channel.IsClosed() {
+		var err error
+		r.channel, err = r.conn.Channel()
+		if err != nil {
+			return fmt.Errorf("failed to recreate channel: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (r *RabbitMQClient) Ping() error {
-	if r.conn.IsClosed() {
-		return fmt.Errorf("connection is closed")
+	if err := r.ensureConnection(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -163,6 +153,9 @@ func (r *RabbitMQClient) PublishVideoUpload(message domain.VideoProcessingMessag
 }
 
 func (r *RabbitMQClient) SubscribeVideoUpload() (<-chan amqp.Delivery, error) {
+	if err := r.ensureConnection(); err != nil {
+		return nil, err
+	}
 	return r.channel.Consume(
 		"video.upload.queue",
 		"",
@@ -175,6 +168,10 @@ func (r *RabbitMQClient) SubscribeVideoUpload() (<-chan amqp.Delivery, error) {
 }
 
 func (r *RabbitMQClient) PublishNotification(message domain.NotificationMessage) error {
+	if err := r.ensureConnection(); err != nil {
+		return err
+	}
+
 	body, err := json.Marshal(message)
 	if err != nil {
 		return err
