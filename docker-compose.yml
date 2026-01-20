@@ -1,0 +1,369 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: g57-postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sh:/docker-entrypoint-initdb.d/init.sh
+      - ./database:/docker-entrypoint-initdb.d/init-scripts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - g57-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: g57-redis
+    command: redis-server --appendonly yes --requirepass redis123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - g57-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: g57-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: g57
+      RABBITMQ_DEFAULT_PASS: g57123456
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./config/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+      - ./config/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./config/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - g57-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: g57-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: g57
+      MINIO_ROOT_PASSWORD: g57123456
+      MINIO_SERVER_URL: http://localhost:9000
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - g57-network
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: g57-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080/api/v1
+    depends_on:
+      - api-gateway
+    networks:
+      - g57-network    
+  
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: g57-api-gateway
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      JWT_SECRET: 6f9e5ef5-ab0c-4bb4-a4f5-caefc64bc5d1
+      REDIS_URL: redis://:redis123@redis:6379
+      AUTH_SERVICE_URL: http://auth-service:8081
+      VIDEO_SERVICE_URL: http://video-service:8082
+      STATUS_SERVICE_URL: http://status-service:8083
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 100
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      video-service:
+        condition: service_started
+      status-service:
+        condition: service_started
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: g57-auth-service
+    environment:
+      PORT: 8081
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: auth_db
+      DB_USER: auth_user
+      DB_PASSWORD: auth123456
+      REDIS_URL: redis://:redis123@redis:6379
+      JWT_SECRET: 6f9e5ef5-ab0c-4bb4-a4f5-caefc64bc5d1
+      VIDEO_SERVICE_URL: http://video-service:8082
+      GIN_MODE: debug
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  video-service:
+    build:
+      context: ./services/video-service
+    container_name: g57-video-service
+    environment:
+      PORT: 8082
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: video_db
+      DB_USER: video_user
+      DB_PASSWORD: video123456
+      RABBITMQ_URL: amqp://g57:g57123456@rabbitmq:5672/
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: g57
+      MINIO_SECRET_KEY: g57123456
+      MINIO_USE_SSL: "false"
+      MINIO_BUCKET_RAW: videos-raw
+      MAX_UPLOAD_SIZE: 524288000
+      JWT_SECRET: 6f9e5ef5-ab0c-4bb4-a4f5-caefc64bc5d1
+      AUTH_SERVICE_URL: http://auth-service:8081
+      GIN_MODE: debug
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  processing-service:
+    build:
+      context: ./services/processing-service
+    container_name: g57-processing-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: processing_db
+      DB_USER: processing_user
+      DB_PASSWORD: processing123456
+      RABBITMQ_URL: amqp://g57:g57123456@rabbitmq:5672/
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: g57
+      MINIO_SECRET_KEY: g57123456
+      MINIO_USE_SSL: "false"
+      MINIO_BUCKET_RAW: videos-raw
+      MINIO_BUCKET_PROCESSED: videos-processed
+      WORKER_COUNT: 5
+      VIDEO_SERVICE_URL: http://video-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  status-service:
+    build:
+      context: ./services/status-service
+    container_name: g57-status-service
+    environment:
+      PORT: 8083
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: status_db
+      DB_USER: status_user
+      DB_PASSWORD: status123456
+      REDIS_URL: redis://:redis123@redis:6379
+      CACHE_TTL: 300
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: g57
+      MINIO_SECRET_KEY: g57123456
+      MINIO_USE_SSL: "false"
+      JWT_SECRET: 6f9e5ef5-ab0c-4bb4-a4f5-caefc64bc5d1
+      VIDEO_SERVICE_URL: http://video-service:8082
+      AUTH_SERVICE_URL: http://auth-service:8081
+      GIN_MODE: debug
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: g57-notification-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: notification_db
+      DB_USER: notification_user
+      DB_PASSWORD: notification123456
+      RABBITMQ_URL: amqp://g57:g57123456@rabbitmq:5672/
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: javaxmail12@gmail.com
+      SMTP_PASSWORD: owhubomiupsysevd
+      SMTP_FROM: noreply@g57.com
+      NOTIFICATION_QUEUE: notification.queue
+      AUTH_SERVICE_URL: http://auth-service:8081
+      VIDEO_SERVICE_URL: http://video-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: g57-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: g57-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: g57-sonarqube
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    ports:
+      - "9005:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: g57-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@g57.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - g57-network
+    restart: unless-stopped
+
+networks:
+  g57-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  minio_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  sonarqube_data:
+    driver: local
+  sonarqube_extensions:
+    driver: local
+  sonarqube_logs:
+    driver: local
