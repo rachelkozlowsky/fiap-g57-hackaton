@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: status-service
+  namespace: g57
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: status-service
+  template:
+    metadata:
+      labels:
+        app: status-service
+    spec:
+      containers:
+        - name: status-service
+          image: g57-status-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+            - name: PORT
+              value: "8083"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-host
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-port
+            - name: DB_NAME
+              value: status_db
+            - name: DB_USER
+              value: status_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: status-db-password
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: redis-url
+            - name: CACHE_TTL
+              value: "300"
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-endpoint
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: minio-access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: minio-secret-key
+            - name: MINIO_USE_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-use-ssl
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: jwt-secret
+            - name: VIDEO_SERVICE_URL
+              value: http://video-service:8082
+            - name: AUTH_SERVICE_URL
+              value: http://auth-service:8081
+            - name: GIN_MODE
+              value: debug
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: status-service
+  namespace: g57
+spec:
+  selector:
+    app: status-service
+  ports:
+    - protocol: TCP
+      port: 8083
+      targetPort: 8083
