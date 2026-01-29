@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: g57
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: g57-auth-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: PORT
+              value: "8081"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-host
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-port
+            - name: DB_NAME
+              value: auth_db
+            - name: DB_USER
+              value: auth_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: auth-db-password
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: redis-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: jwt-secret
+            - name: VIDEO_SERVICE_URL
+              value: http://video-service:8082
+            - name: GIN_MODE
+              value: debug
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: g57
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081

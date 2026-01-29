@@ -94,8 +94,8 @@ services:
     depends_on:
       - api-gateway
     networks:
-      - g57-network    
-  
+      - g57-network
+
   api-gateway:
     build:
       context: ./services/api-gateway
@@ -348,7 +348,7 @@ networks:
 volumes:
   postgres_data:
     driver: local
-  
+
   redis_data:
     driver: local
   rabbitmq_data:

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: g57
+  labels:
+    name: g57
+    environment: production
