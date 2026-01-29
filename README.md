@@ -122,3 +122,4 @@
 - **Monitoramento**: Prometheus + Grafana
 - **CI/CD**: GitHub Actions
 
+
