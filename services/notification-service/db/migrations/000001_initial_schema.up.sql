@@ -1,5 +1,4 @@
 -- Notification Service Database Schema
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Notifications table - Core entity for Notification Service
 -- Note: user_id and video_id are logical references to other services

@@ -38,7 +38,11 @@ func InitDatabase() *Database {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 
-	log.Println("✅ Connected to PostgreSQL database")
+	log.Println("Connected to PostgreSQL database")
+
+	if err := RunMigrations(db, dbname); err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
+	}
 
 	return &Database{db: db}
 }

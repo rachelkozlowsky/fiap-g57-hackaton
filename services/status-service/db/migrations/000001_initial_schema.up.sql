@@ -1,5 +1,4 @@
 -- Status Service Database Schema
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Status cache table - for caching aggregated status information
 -- This service primarily reads from Video Service via HTTP and caches results

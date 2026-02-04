@@ -42,6 +42,21 @@ O script irá:
 5.  Perguntar se deseja rebuildar as imagens Docker localmente.
 6.  Ao final, abrir um túnel para o API Gateway automaticamente.
 
+**Importante:** As migrações de banco de dados são executadas automaticamente pelos próprios serviços ao iniciarem, usando `golang-migrate`. Não é necessário executar scripts SQL manualmente.
+
+## 🧹 Limpeza Completa (Reiniciar do Zero)
+
+Se você quiser deletar tudo e começar do zero:
+
+```powershell
+.\cleanup-k8s.ps1
+```
+
+Este script irá:
+- Deletar o namespace `g57` (removendo todos os recursos)
+- Opcionalmente, limpar as imagens Docker do Minikube
+- Deixar o ambiente pronto para um novo deploy
+
 ## 📦 3. Instalação Manual (Passo a Passo)
 
 Caso prefira executar comando por comando:

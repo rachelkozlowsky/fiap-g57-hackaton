@@ -12,6 +12,7 @@ require (
 	github.com/redis/go-redis/v9 v9.4.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.18.0
+	github.com/golang-migrate/migrate/v4 v4.17.0
 )
 
 require (

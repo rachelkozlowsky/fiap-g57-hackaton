@@ -18,6 +18,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 
 COPY --from=builder /app/video-service .
+COPY --from=builder /app/db/migrations ./db/migrations
 
 EXPOSE 8082
 

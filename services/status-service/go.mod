@@ -9,6 +9,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/redis/go-redis/v9 v9.4.0
 	github.com/stretchr/testify v1.8.4
+	github.com/golang-migrate/migrate/v4 v4.17.0
 )
 
 require (

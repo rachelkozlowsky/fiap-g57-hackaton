@@ -1,6 +1,4 @@
 -- Auth Service Database Schema
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Users table - Core entity for Auth Service
 CREATE TABLE users (

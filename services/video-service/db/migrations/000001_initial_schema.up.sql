@@ -1,6 +1,4 @@
 -- Video Service Database Schema
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Videos table - Core entity for Video Service
 -- Note: user_id is stored but user data comes from Auth Service via HTTP

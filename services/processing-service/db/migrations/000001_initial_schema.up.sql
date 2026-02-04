@@ -1,6 +1,4 @@
 -- Processing Service Database Schema
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Processing jobs table - Core entity for Processing Service
 -- Note: video_id references Video Service (different DB, logical reference only)

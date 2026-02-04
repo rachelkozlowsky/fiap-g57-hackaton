@@ -18,6 +18,7 @@ RUN apk --no-cache add ffmpeg ca-certificates
 WORKDIR /root/
 
 COPY --from=builder /app/processing-service .
+COPY --from=builder /app/db/migrations ./db/migrations
 
 RUN mkdir -p /root/temp
 
