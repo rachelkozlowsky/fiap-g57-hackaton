@@ -96,4 +96,4 @@ VALUES
 COMMENT ON TABLE notifications IS 'Stores notification queue and history';
 COMMENT ON TABLE notification_templates IS 'Reusable notification templates';
 
-VACUUM ANALYZE;
+

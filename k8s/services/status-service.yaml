@@ -13,6 +13,25 @@ spec:
       labels:
         app: status-service
     spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: status-db-password
+          command:
+            - sh
+            - -c
+            - |
+              until psql -h postgres -U status_user -d status_db -c "SELECT 1" > /dev/null 2>&1; do
+                echo "Aguardando banco de dados status_db estar totalmente pronto..."
+                sleep 2
+              done
+              echo "Banco pronto! Limpando possível estado dirty de tentativas anteriores..."
+              psql -h postgres -U status_user -d status_db -c "UPDATE schema_migrations SET dirty = false WHERE version = 1;" || true
       containers:
         - name: status-service
           image: g57-status-service:latest

@@ -64,4 +64,4 @@ $$ LANGUAGE plpgsql;
 COMMENT ON TABLE processing_jobs IS 'Tracks video processing jobs';
 COMMENT ON TABLE system_metrics IS 'System performance metrics';
 
-VACUUM ANALYZE;
+

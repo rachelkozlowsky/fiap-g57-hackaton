@@ -96,4 +96,4 @@ COMMENT ON TABLE users IS 'Stores user account information';
 COMMENT ON TABLE sessions IS 'JWT refresh token sessions';
 COMMENT ON TABLE audit_logs IS 'Audit trail for security and compliance';
 
-VACUUM ANALYZE;
+

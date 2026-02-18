@@ -82,4 +82,4 @@ $$ LANGUAGE plpgsql;
 
 COMMENT ON TABLE videos IS 'Stores video metadata and processing status';
 
-VACUUM ANALYZE;
+

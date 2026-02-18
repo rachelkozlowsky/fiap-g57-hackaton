@@ -63,4 +63,4 @@ FROM status_cache;
 COMMENT ON TABLE status_cache IS 'Caches status data from Video Service';
 COMMENT ON TABLE query_logs IS 'Logs status queries for analytics';
 
-VACUUM ANALYZE;
+
