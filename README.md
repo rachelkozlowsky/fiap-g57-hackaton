@@ -2,6 +2,9 @@
 
 ### Microsserviços com Database per Service
 
+> 💡 **Dica:** Você pode abrir o arquivo `arquitetura-hakaton.drawio.xml` no [draw.io](https://app.diagrams.net/) para visualizar o desenho completo.
+
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                          API Gateway                             │
@@ -113,7 +116,6 @@
 - **API Gateway**: Node.js 20
 - **Bancos de Dados**: 
   - PostgreSQL 15 (5 instâncias - uma por serviço)
-  - Portas: 5433 (auth), 5434 (video), 5435 (processing), 5436 (status), 5437 (notification)
 - **Cache**: Redis 7
 - **Mensageria**: RabbitMQ 3.12
 - **Storage**: MinIO (S3-compatible)
