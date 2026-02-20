@@ -95,3 +95,18 @@ spec:
               value: "5"
             - name: VIDEO_SERVICE_URL
               value: http://video-service:8082
+          ports:
+            - containerPort: 8090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: processing-service
+  namespace: g57
+spec:
+  selector:
+    app: processing-service
+  ports:
+    - protocol: TCP
+      port: 8090
+      targetPort: 8090

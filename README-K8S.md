@@ -90,23 +90,51 @@ kubectl apply -f k8s/services/frontend.yaml
 
 ## 🌐 4. Acessando a Aplicação
 
-Como o Minikube roda isolado, você precisa liberar o acesso às portas.
+Como o Minikube roda isolado, você precisa liberar o acesso às portas. Para garantir que tudo funcione em `localhost` como esperado, execute os seguintes comandos em terminais separados:
 
-### API Gateway (Backend)
-Para que o Frontend consiga chamar a API em `localhost:8080`, você deve criar um túnel:
+### 🖥️ Frontend & API (Essencial)
 
+**Frontend:** (Acesse em http://localhost:5173)
+```powershell
+kubectl port-forward service/frontend 5173:5173 -n g57
+```
+
+**API Gateway:** (Backend em http://localhost:8080)
 ```powershell
 kubectl port-forward service/api-gateway 8080:8080 -n g57
 ```
-*Mantenha esse terminal aberto.*
 
-### Frontend
-Para acessar a interface visual no navegador:
+### 📊 Monitoramento & Infraestrutura (Opcional)
+
+**Grafana:** (Acesse em http://localhost:3000 - admin/admin)
+```powershell
+kubectl port-forward service/grafana 3000:3000 -n g57
+```
+
+**Prometheus:** (Acesse em http://localhost:9090)
+```powershell
+kubectl port-forward service/prometheus 9090:9090 -n g57
+```
+
+**RabbitMQ Management:** (Acesse em http://localhost:15672 - g57/g57123456)
+```powershell
+kubectl port-forward service/rabbitmq 15672:15672 -n g57
+```
+
+**MinIO Console:** (Acesse em http://localhost:9001 - g57/g57123456)
+```powershell
+kubectl port-forward service/minio 9001:9001 -n g57
+```
+
+---
+
+### Alternativa: Minikube Service (Sem Port-Forward fixo)
+Se não quiser prender terminais, você pode pedir ao minikube para abrir cada serviço diretamente:
 
 ```powershell
 minikube service frontend -n g57
+minikube service grafana -n g57
 ```
-Isso abrirá automaticamente o navegador com a URL correta.
 
 ### Kubernetes Dashboard (Visualizar Logs e Pods)
 ```powershell

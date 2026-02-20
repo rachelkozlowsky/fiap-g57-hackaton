@@ -19,6 +19,7 @@ spec:
           ports:
             - containerPort: 5672
             - containerPort: 15672
+            - containerPort: 15692
           env:
             - name: RABBITMQ_DEFAULT_USER
               value: g57
@@ -45,3 +46,7 @@ spec:
       protocol: TCP
       port: 15672
       targetPort: 15672
+    - name: prometheus
+      protocol: TCP
+      port: 15692
+      targetPort: 15692
