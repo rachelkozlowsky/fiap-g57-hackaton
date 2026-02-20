@@ -1,0 +1,504 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: g57
+data:
+  datasource.yml: |
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  namespace: g57
+data:
+  dashboard.yml: |
+    apiVersion: 1
+
+    providers:
+      - name: 'G57'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: g57
+data:
+  g57.json: |
+    {
+        "annotations": {
+            "list": [
+                {
+                    "builtIn": 1,
+                    "datasource": {
+                        "type": "grafana",
+                        "uid": "-- Grafana --"
+                    },
+                    "enable": true,
+                    "hide": true,
+                    "iconColor": "rgba(0, 211, 255, 1)",
+                    "name": "Annotations & Alerts",
+                    "type": "dashboard"
+                }
+            ]
+        },
+        "editable": true,
+        "fiscalYearStartMonth": 0,
+        "graphTooltip": 0,
+        "id": null,
+        "links": [],
+        "liveNow": false,
+        "panels": [
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 4,
+                    "w": 24,
+                    "x": 0,
+                    "y": 0
+                },
+                "id": 1,
+                "options": {
+                    "colorMode": "background",
+                    "graphMode": "none",
+                    "justifyMode": "auto",
+                    "orientation": "horizontal",
+                    "reduceOptions": {
+                        "calcs": [
+                            "last"
+                        ],
+                        "fields": "",
+                        "values": false
+                    },
+                    "textMode": "name"
+                },
+                "fieldConfig": {
+                    "defaults": {
+                        "mappings": [
+                            {
+                                "options": {
+                                    "0": {
+                                        "color": "red",
+                                        "index": 0,
+                                        "text": "DOWN"
+                                    },
+                                    "1": {
+                                        "color": "green",
+                                        "index": 1,
+                                        "text": "UP"
+                                    }
+                                },
+                                "type": "value"
+                            }
+                        ],
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {
+                                    "color": "red",
+                                    "value": null
+                                },
+                                {
+                                    "color": "green",
+                                    "value": 1
+                                }
+                            ]
+                        }
+                    },
+                    "overrides": []
+                },
+                "pluginVersion": "10.0.0",
+                "targets": [
+                    {
+                        "datasource": {
+                            "type": "prometheus",
+                            "uid": "Prometheus"
+                        },
+                        "editorMode": "code",
+                        "expr": "up",
+                        "legendFormat": "{{job}}",
+                        "range": true,
+                        "refId": "A"
+                    }
+                ],
+                "title": "Service Status (UP)",
+                "type": "stat"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 4
+                },
+                "id": 2,
+                "targets": [
+                    {
+                        "expr": "go_goroutines{job=\"auth-service\"}",
+                        "legendFormat": "Goroutines",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Auth Service - Goroutines",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 4
+                },
+                "id": 3,
+                "targets": [
+                    {
+                        "expr": "go_memstats_alloc_bytes{job=\"auth-service\"}",
+                        "legendFormat": "Memory Alloc",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Auth Service - Memory",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 12
+                },
+                "id": 5,
+                "targets": [
+                    {
+                        "expr": "go_goroutines{job=\"video-service\"}",
+                        "legendFormat": "Goroutines",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Video Service - Goroutines",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 12
+                },
+                "id": 6,
+                "targets": [
+                    {
+                        "expr": "go_memstats_alloc_bytes{job=\"video-service\"}",
+                        "legendFormat": "Memory Alloc",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Video Service - Memory",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 20
+                },
+                "id": 7,
+                "targets": [
+                    {
+                        "expr": "go_goroutines{job=\"processing-service\"}",
+                        "legendFormat": "Goroutines",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Processing Service - Goroutines",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 20
+                },
+                "id": 8,
+                "targets": [
+                    {
+                        "expr": "go_memstats_alloc_bytes{job=\"processing-service\"}",
+                        "legendFormat": "Memory Alloc",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Processing Service - Memory",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 28
+                },
+                "id": 9,
+                "targets": [
+                    {
+                        "expr": "go_goroutines{job=\"notification-service\"}",
+                        "legendFormat": "Goroutines",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Notification Service - Goroutines",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 28
+                },
+                "id": 10,
+                "targets": [
+                    {
+                        "expr": "go_memstats_alloc_bytes{job=\"notification-service\"}",
+                        "legendFormat": "Memory Alloc",
+                        "refId": "A"
+                    }
+                ],
+                "title": "Notification Service - Memory",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 36
+                },
+                "id": 11,
+                "targets": [
+                    {
+                        "expr": "process_resident_memory_bytes{job=\"api-gateway\"}",
+                        "legendFormat": "Memory RSS",
+                        "refId": "A"
+                    }
+                ],
+                "title": "API Gateway - Memory",
+                "type": "timeseries"
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "id": 4,
+                "gridPos": {
+                    "x": 12,
+                    "y": 36,
+                    "w": 12,
+                    "h": 8
+                },
+                "title": "RabbitMQ Messages in Queue",
+                "type": "timeseries",
+                "targets": [
+                    {
+                        "expr": "rabbitmq_queue_messages_ready",
+                        "legendFormat": "{{queue}}",
+                        "refId": "A"
+                    }
+                ]
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "id": 12,
+                "gridPos": {
+                    "x": 0,
+                    "y": 44,
+                    "w": 12,
+                    "h": 8
+                },
+                "title": "HTTP Request Rate (Req/s)",
+                "type": "timeseries",
+                "targets": [
+                    {
+                        "expr": "sum by (job) (rate(http_requests_total[1m]))",
+                        "legendFormat": "{{job}}",
+                        "refId": "A"
+                    }
+                ]
+            },
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "id": 13,
+                "gridPos": {
+                    "x": 12,
+                    "y": 44,
+                    "w": 12,
+                    "h": 8
+                },
+                "title": "HTTP 5xx Errors (Req/s)",
+                "type": "timeseries",
+                "targets": [
+                    {
+                        "expr": "sum by (job) (rate(http_requests_total{code=~\"5..\"}[1m])) or sum by (job) (rate(http_requests_total{status=~\"5..\"}[1m]))",
+                        "legendFormat": "{{job}} Error",
+                        "refId": "A"
+                    }
+                ]
+            }
+        ],
+        "refresh": "5s",
+        "schemaVersion": 38,
+        "style": "dark",
+        "tags": [],
+        "templating": {
+            "list": []
+        },
+        "time": {
+            "from": "now-15m",
+            "to": "now"
+        },
+        "timepicker": {},
+        "timezone": "",
+        "title": "G57 Microservices",
+        "uid": "g57-main",
+        "version": 1,
+        "weekStart": ""
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: g57
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+          volumeMounts:
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources/datasource.yml
+              subPath: datasource.yml
+            - name: grafana-dashboards-provider
+              mountPath: /etc/grafana/provisioning/dashboards/dashboard.yml
+              subPath: dashboard.yml
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards/g57.json
+              subPath: g57.json
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+      volumes:
+        - name: grafana-datasources
+          configMap:
+            name: grafana-datasources
+        - name: grafana-dashboards-provider
+          configMap:
+            name: grafana-dashboards-provider
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: g57
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: g57
+spec:
+  selector:
+    app: grafana
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+

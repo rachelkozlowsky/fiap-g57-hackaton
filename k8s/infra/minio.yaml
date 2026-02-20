@@ -69,3 +69,41 @@ spec:
   resources:
     requests:
       storage: 5Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init-buckets
+  namespace: g57
+spec:
+  template:
+    spec:
+      containers:
+      - name: minio-mc
+        image: minio/mc
+        env:
+        - name: MINIO_ENDPOINT
+          value: minio
+        - name: MINIO_ACCESS_KEY
+          value: g57
+        - name: MINIO_SECRET_KEY
+          value: g57123456
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          # Aguarda o MinIO iniciar
+          until mc alias set myminio http://$MINIO_ENDPOINT:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY; do
+            echo "Aguardando MinIO estar pronto..."
+            sleep 2
+          done
+          
+          # Cria os buckets se não existirem
+          mc mb myminio/videos-raw --ignore-existing
+          mc mb myminio/videos-processed --ignore-existing
+          
+          # Define politicas de acesso (opcional, mas util para visualização)
+          mc anonymous set public myminio/videos-raw
+          mc anonymous set public myminio/videos-processed
+          
+          echo "Buckets configurados com sucesso!"
+      restartPolicy: OnFailure
