@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-metrics
+  namespace: g57
+data:
+  metrics.txt: |
+    frontend_up 1
+

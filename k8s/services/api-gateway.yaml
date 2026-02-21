@@ -24,6 +24,13 @@ spec:
         ports:
         - containerPort: 8080
           name: http
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
         env:
         - name: NODE_ENV
           value: "development"
@@ -48,14 +55,8 @@ spec:
         - name: RATE_LIMIT_WINDOW_MS
           value: "60000"
         - name: RATE_LIMIT_MAX_REQUESTS
-          value: "100"
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
+          value: "100000"
+
         livenessProbe:
           httpGet:
             path: /health/live

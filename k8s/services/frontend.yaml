@@ -19,9 +19,17 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5173
-          env:
-            - name: VITE_API_URL
-              value: "http://localhost:8080/api/v1"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: metrics-volume
+              mountPath: /app/public/metrics.txt
+              subPath: metrics.txt
           livenessProbe:
             httpGet:
               path: /
@@ -34,10 +42,13 @@ spec:
               port: 5173
             initialDelaySeconds: 10
             periodSeconds: 5
-          volumeMounts:
-            - name: metrics-volume
-              mountPath: /app/public/metrics.txt
-              subPath: metrics.txt
+          env:
+            - name: VITE_API_URL
+              value: "http://localhost:8080/api/v1" 
+              # Note: In a real minikube setup accessed from host, this needs to point to the exposed API Gateway IP/Port. 
+              # Or use Ingress. For now, localhost:8080 implies port forwarding or direct access if browser is external.
+              # Since it's VITE, it builds at runtime or build time. If it's build time, this env var needs to be set during build.
+              # If it's runtime (dev mode), localhost refers to the USER'S machine browser.
       volumes:
         - name: metrics-volume
           configMap:
@@ -51,7 +62,7 @@ metadata:
 spec:
   selector:
     app: frontend
-  type: ClusterIP
+  type: LoadBalancer
   ports:
     - protocol: TCP
       port: 5173

@@ -363,6 +363,72 @@
                     "refId": "A"
                 }
             ]
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 52
+            },
+            "id": 14,
+            "targets": [
+                {
+                    "expr": "go_goroutines{job=\"status-service\"}",
+                    "legendFormat": "Goroutines",
+                    "refId": "A"
+                }
+            ],
+            "title": "Status Service - Goroutines",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 52
+            },
+            "id": 15,
+            "targets": [
+                {
+                    "expr": "go_memstats_alloc_bytes{job=\"status-service\"}",
+                    "legendFormat": "Memory Alloc",
+                    "refId": "A"
+                }
+            ],
+            "title": "Status Service - Memory",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 60
+            },
+            "id": 16,
+            "targets": [
+                {
+                    "expr": "count(up{job!=\"prometheus\"}) by (job)",
+                    "legendFormat": "{{job}}",
+                    "refId": "A"
+                }
+            ],
+            "title": "Pod Count (Scaling)",
+            "type": "timeseries"
         }
     ],
     "refresh": "5s",
