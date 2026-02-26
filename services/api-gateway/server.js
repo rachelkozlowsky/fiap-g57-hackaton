@@ -30,15 +30,20 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
-app.use(limiter);
+let limiter;
+if (!process.env.DISABLE_RATE_LIMIT && process.env.NODE_ENV !== 'loadtest') {
+  limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use(limiter);
+} else {
+  logger.warn('rate limiter disabled (load test or DISABLE_RATE_LIMIT)');
+}
 
 app.get('/health', (req, res) => {
   res.json({
@@ -110,9 +115,11 @@ const VIDEO_SERVICE_URL = process.env.VIDEO_SERVICE_URL || 'http://localhost:808
 const STATUS_SERVICE_URL = process.env.STATUS_SERVICE_URL || 'http://localhost:8083';
 
 const proxyOptions = {
+  timeout: 10000,          // 10 s
+  proxyTimeout: 10000,
   changeOrigin: true,
-  logLevel: 'debug',
-  onProxyReq: (proxyReq, req, res) => {
+  logLevel: 'debug',  timeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000,      // espera 10s por padrão
+  proxyTimeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000,  onProxyReq: (proxyReq, req, res) => {
 
     const requestId = req.headers['x-request-id'] || generateRequestId();
     proxyReq.setHeader('X-Request-ID', requestId);
