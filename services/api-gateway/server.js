@@ -31,8 +31,9 @@ app.use(cors());
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 
 
+// Rate limit temporariamente desabilitado para teste de carga
 let limiter;
-if (!process.env.DISABLE_RATE_LIMIT && process.env.NODE_ENV !== 'loadtest') {
+if (false && !process.env.DISABLE_RATE_LIMIT && process.env.NODE_ENV !== 'loadtest') {
   limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
@@ -118,8 +119,8 @@ const proxyOptions = {
   timeout: 10000,          // 10 s
   proxyTimeout: 10000,
   changeOrigin: true,
-  logLevel: 'debug',  timeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000,      // espera 10s por padrão
-  proxyTimeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000,  onProxyReq: (proxyReq, req, res) => {
+  logLevel: 'debug', timeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000,      // espera 10s por padrão
+  proxyTimeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000, onProxyReq: (proxyReq, req, res) => {
 
     const requestId = req.headers['x-request-id'] || generateRequestId();
     proxyReq.setHeader('X-Request-ID', requestId);
