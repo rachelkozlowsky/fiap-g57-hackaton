@@ -144,6 +144,32 @@ kubectl port-forward service/metabase 3001:3001 -n g57
 ```
 
 ---
+## 📈 Como Acompanhar o Teste de Carga
+
+Para validar o escalonamento horizontal (HPA) e a performance da aplicação:
+
+1.  **Inicie o Teste de Carga (K6):**
+    O teste é executado como um Job dentro do cluster para minimizar a latência de rede.
+    ```powershell
+    # Se o job já existiu, delete primeiro
+    kubectl delete job k6-load-test -n g57
+    
+    # Inicie o teste
+    kubectl apply -f k8s/infra/k6-job.yaml
+    ```
+
+2.  **Monitore o Escalonamento em Tempo Real:**
+    Abra um terminal e observe o número de réplicas aumentando automaticamente:
+    ```powershell
+    kubectl get hpa -n g57 -w
+    ```
+
+3.  **Visualize no Grafana:**
+    Acesse o dashboard "G57 Microservices" (http://localhost:3000) e observe:
+    *   **Pod Count (Scaling):** Novo painel mostrando a quantidade de pods de cada serviço subindo.
+    *   **HTTP Request Rate:** O aumento no volume de requisições.
+    *   **CPU/Memory:** O consumo de recursos disparando.
+
 
 ## 📊 5. Metabase — Web Analytics
 

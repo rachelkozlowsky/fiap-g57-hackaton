@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"auth-service/domain"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -8,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-	"auth-service/domain"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

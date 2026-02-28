@@ -30,6 +30,17 @@ spec:
             - name: metrics-volume
               mountPath: /app/public/metrics.txt
               subPath: metrics.txt
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: metrics-volume
+              mountPath: /app/public/metrics.txt
+              subPath: metrics.txt
           livenessProbe:
             httpGet:
               path: /
@@ -62,6 +73,7 @@ metadata:
 spec:
   selector:
     app: frontend
+  type: LoadBalancer
   type: LoadBalancer
   ports:
     - protocol: TCP

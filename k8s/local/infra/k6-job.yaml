@@ -1,29 +1,29 @@
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: k6-load-test
-  namespace: g57
-spec:
-  template:
-    spec:
-      containers:
-      - name: k6
-        image: grafana/k6:latest
-        command: ["k6", "run", "/scripts/loadtest.js"]
-        volumeMounts:
-        - name: k6-scripts-vol
-          mountPath: /scripts
-        resources:
-          requests:
-            cpu: 500m
-            memory: 512Mi
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-      restartPolicy: Never
-      volumes:
-      - name: k6-scripts-vol
-        configMap:
-          name: k6-scripts
-  backoffLimit: 1
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: k6-load-test
+#   namespace: g57
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: k6
+#         image: grafana/k6:latest
+#         command: ["k6", "run", "/scripts/loadtest.js"]
+#         volumeMounts:
+#         - name: k6-scripts-vol
+#           mountPath: /scripts
+#         resources:
+#           requests:
+#             cpu: 500m
+#             memory: 512Mi
+#           limits:
+#             cpu: 1000m
+#             memory: 1Gi
+#       restartPolicy: Never
+#       volumes:
+#       - name: k6-scripts-vol
+#         configMap:
+#           name: k6-scripts
+#   backoffLimit: 1
 

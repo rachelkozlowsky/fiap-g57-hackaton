@@ -118,8 +118,8 @@ const proxyOptions = {
   timeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 300000,      // 300s default (supports large file uploads)
   proxyTimeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 300000,
   changeOrigin: true,
-  logLevel: 'debug',
-  onProxyReq: (proxyReq, req, res) => {
+  logLevel: 'debug', timeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000,      // espera 10s por padrão
+  proxyTimeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 10000, onProxyReq: (proxyReq, req, res) => {
 
     const requestId = req.headers['x-request-id'] || generateRequestId();
     proxyReq.setHeader('X-Request-ID', requestId);
