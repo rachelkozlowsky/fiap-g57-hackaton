@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 	"auth-service/database"
+	"auth-service/domain"
 	"auth-service/infra/handlers"
 	"auth-service/infra/metrics"
 	"auth-service/infra/utils"
@@ -59,7 +60,7 @@ func main() {
 	log.Println("Server exited")
 }
 
-func setupRouter(db *database.Database, redis *database.RedisClient) *gin.Engine {
+func setupRouter(db domain.DatabaseInterface, redis domain.RedisClientInterface) *gin.Engine {
 	if utils.GetEnv("GIN_MODE", "debug") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -124,7 +125,7 @@ func livenessProbe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "alive"})
 }
 
-func readinessProbe(db *database.Database, redis *database.RedisClient) gin.HandlerFunc {
+func readinessProbe(db domain.DatabaseInterface, redis domain.RedisClientInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := db.Ping(); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{

@@ -15,17 +15,20 @@ data:
         CREATE USER processing_user WITH PASSWORD 'processing123456';
         CREATE USER notification_user WITH PASSWORD 'notification123456';
         CREATE USER status_user WITH PASSWORD 'status123456';
+        CREATE USER metabase_user WITH PASSWORD 'metabase123456';
 
         CREATE DATABASE auth_db OWNER auth_user;
         CREATE DATABASE video_db OWNER video_user;
         CREATE DATABASE processing_db OWNER processing_user;
         CREATE DATABASE notification_db OWNER notification_user;
         CREATE DATABASE status_db OWNER status_user;
+        CREATE DATABASE metabase_db OWNER metabase_user;
     EOSQL
 
     # Grant Permissions
-    for db in auth_db video_db processing_db notification_db status_db; do
+    for db in auth_db video_db processing_db notification_db status_db metabase_db; do
         user="${db%_db}_user"
+        if [ "$db" = "metabase_db" ]; then user="metabase_user"; fi
         psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$db" <<-EOSQL
             GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $user;
             GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $user;

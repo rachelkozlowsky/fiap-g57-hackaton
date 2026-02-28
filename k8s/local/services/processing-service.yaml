@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: status-service
+  name: processing-service
   namespace: g57
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: status-service
+      app: processing-service
   template:
     metadata:
       labels:
-        app: status-service
+        app: processing-service
     spec:
       initContainers:
         - name: wait-for-db
@@ -21,26 +21,29 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: g57-secrets
-                  key: status-db-password
+                  key: processing-db-password
           command:
             - sh
             - -c
             - |
-              until psql -h postgres -U status_user -d status_db -c "SELECT 1" > /dev/null 2>&1; do
-                echo "Aguardando banco de dados status_db estar totalmente pronto..."
+              until psql -h postgres -U processing_user -d processing_db -c "SELECT 1" > /dev/null 2>&1; do
+                echo "Aguardando banco de dados processing_db estar totalmente pronto..."
                 sleep 2
               done
               echo "Banco pronto! Limpando possível estado dirty de tentativas anteriores..."
-              psql -h postgres -U status_user -d status_db -c "UPDATE schema_migrations SET dirty = false WHERE version = 1;" || true
+              psql -h postgres -U processing_user -d processing_db -c "UPDATE schema_migrations SET dirty = false WHERE version = 1;" || true
       containers:
-        - name: status-service
-          image: g57-status-service:latest
+        - name: processing-service
+          image: g57-processing-service:latest
           imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 8083
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           env:
-            - name: PORT
-              value: "8083"
             - name: DB_HOST
               valueFrom:
                 configMapKeyRef:
@@ -52,21 +55,19 @@ spec:
                   name: g57-config
                   key: postgres-port
             - name: DB_NAME
-              value: status_db
+              value: processing_db
             - name: DB_USER
-              value: status_user
+              value: processing_user
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: g57-secrets
-                  key: status-db-password
-            - name: REDIS_URL
+                  key: processing-db-password
+            - name: RABBITMQ_URL
               valueFrom:
                 configMapKeyRef:
                   name: g57-config
-                  key: redis-url
-            - name: CACHE_TTL
-              value: "300"
+                  key: rabbitmq-url
             - name: MINIO_ENDPOINT
               valueFrom:
                 configMapKeyRef:
@@ -87,27 +88,32 @@ spec:
                 configMapKeyRef:
                   name: g57-config
                   key: minio-use-ssl
-            - name: JWT_SECRET
+            - name: MINIO_BUCKET_RAW
               valueFrom:
-                secretKeyRef:
-                  name: g57-secrets
-                  key: jwt-secret
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-bucket-raw
+            - name: MINIO_BUCKET_PROCESSED
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-bucket-processed
+            - name: WORKER_COUNT
+              value: "5"
             - name: VIDEO_SERVICE_URL
               value: http://video-service:8082
-            - name: AUTH_SERVICE_URL
-              value: http://auth-service:8081
-            - name: GIN_MODE
-              value: debug
+          ports:
+            - containerPort: 8090
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: status-service
+  name: processing-service
   namespace: g57
 spec:
   selector:
-    app: status-service
+    app: processing-service
   ports:
     - protocol: TCP
-      port: 8083
-      targetPort: 8083
+      port: 8090
+      targetPort: 8090

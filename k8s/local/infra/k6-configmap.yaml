@@ -1,0 +1,32 @@
+# apiVersion: v1
+
+#     }
+#       // Se tiver endpoint publico de carga, adicione aqui.
+#       // Como precisa de token, vamos focar no health por enquanto. 
+#       // Testando upload (simulado se possível, ou apenas endpoint protegido para carga)
+      
+#       sleep(1);
+#       check(res, { 'status was 200': (r) => r.status == 200 });
+#       const res = http.get('http://api-gateway:8080/health');
+#       // Testando o health endpoint do api-gateway
+#     export default function () {
+
+#     };
+#       },
+#         http_req_duration: ['p(95)<500'],
+#       thresholds: {
+#       ],
+#         { duration: '30s', target: 0 },
+#         { duration: '1m', target: 20 },
+#         { duration: '30s', target: 20 },
+#       stages: [
+#     export const options = {
+
+#     import { check, sleep } from 'k6';
+#     import http from 'k6/http';
+#   loadtest.js: |
+# data:
+#   namespace: g57
+#   name: k6-scripts
+# metadata:
+# kind: ConfigMap

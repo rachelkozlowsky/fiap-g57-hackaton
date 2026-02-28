@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: notification-service
+  name: video-service
   namespace: g57
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: notification-service
+      app: video-service
   template:
     metadata:
       labels:
-        app: notification-service
+        app: video-service
     spec:
       initContainers:
         - name: wait-for-db
@@ -21,22 +21,33 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: g57-secrets
-                  key: notification-db-password
+                  key: video-db-password
           command:
             - sh
             - -c
             - |
-              until psql -h postgres -U notification_user -d notification_db -c "SELECT 1" > /dev/null 2>&1; do
-                echo "Aguardando banco de dados notification_db estar totalmente pronto..."
+              until psql -h postgres -U video_user -d video_db -c "SELECT 1" > /dev/null 2>&1; do
+                echo "Aguardando banco de dados video_db estar totalmente pronto..."
                 sleep 2
               done
               echo "Banco pronto! Limpando possível estado dirty de tentativas anteriores..."
-              psql -h postgres -U notification_user -d notification_db -c "UPDATE schema_migrations SET dirty = false WHERE version = 1;" || true
+              psql -h postgres -U video_user -d video_db -c "UPDATE schema_migrations SET dirty = false WHERE version = 1;" || true
       containers:
-        - name: notification-service
-          image: g57-notification-service:latest
+        - name: video-service
+          image: g57-video-service:latest
           imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
           env:
+            - name: PORT
+              value: "8082"
             - name: DB_HOST
               valueFrom:
                 configMapKeyRef:
@@ -48,65 +59,65 @@ spec:
                   name: g57-config
                   key: postgres-port
             - name: DB_NAME
-              value: notification_db
+              value: video_db
             - name: DB_USER
-              value: notification_user
+              value: video_user
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: g57-secrets
-                  key: notification-db-password
+                  key: video-db-password
             - name: RABBITMQ_URL
               valueFrom:
                 configMapKeyRef:
                   name: g57-config
                   key: rabbitmq-url
-            - name: SMTP_HOST
+            - name: MINIO_ENDPOINT
               valueFrom:
                 configMapKeyRef:
                   name: g57-config
-                  key: smtp-host
-            - name: SMTP_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: g57-config
-                  key: smtp-port
-            - name: SMTP_USER
+                  key: minio-endpoint
+            - name: MINIO_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: g57-secrets
-                  key: smtp-user
-            - name: SMTP_PASSWORD
+                  key: minio-access-key
+            - name: MINIO_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: g57-secrets
-                  key: smtp-password
-            - name: SMTP_FROM
+                  key: minio-secret-key
+            - name: MINIO_USE_SSL
               valueFrom:
                 configMapKeyRef:
                   name: g57-config
-                  key: smtp-from
-            - name: NOTIFICATION_QUEUE
+                  key: minio-use-ssl
+            - name: MINIO_BUCKET_RAW
               valueFrom:
                 configMapKeyRef:
                   name: g57-config
-                  key: notification-queue
+                  key: minio-bucket-raw
+            - name: MAX_UPLOAD_SIZE
+              value: "524288000"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: jwt-secret
             - name: AUTH_SERVICE_URL
               value: http://auth-service:8081
-            - name: VIDEO_SERVICE_URL
-              value: http://video-service:8082
-          ports:
-            - containerPort: 8091
+            - name: GIN_MODE
+              value: debug
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: notification-service
+  name: video-service
   namespace: g57
 spec:
   selector:
-    app: notification-service
+    app: video-service
   ports:
     - protocol: TCP
-      port: 8091
-      targetPort: 8091
+      port: 8082
+      targetPort: 8082

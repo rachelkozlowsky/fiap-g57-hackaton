@@ -30,15 +30,20 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
-app.use(limiter);
+let limiter;
+if (!process.env.DISABLE_RATE_LIMIT && process.env.NODE_ENV !== 'loadtest') {
+  limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use(limiter);
+} else {
+  logger.warn('rate limiter disabled (load test or DISABLE_RATE_LIMIT)');
+}
 
 app.get('/health', (req, res) => {
   res.json({
@@ -110,6 +115,8 @@ const VIDEO_SERVICE_URL = process.env.VIDEO_SERVICE_URL || 'http://localhost:808
 const STATUS_SERVICE_URL = process.env.STATUS_SERVICE_URL || 'http://localhost:8083';
 
 const proxyOptions = {
+  timeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 300000,      // 300s default (supports large file uploads)
+  proxyTimeout: parseInt(process.env.PROXY_TIMEOUT_MS) || 300000,
   changeOrigin: true,
   logLevel: 'debug',
   onProxyReq: (proxyReq, req, res) => {
@@ -125,7 +132,7 @@ const proxyOptions = {
     logger.error(`Proxy error: ${err.message}`);
     res.status(502).json({
       error: 'Bad Gateway',
-      message: 'Service temporarily unavailable'
+      message: err.message
     });
   }
 };
@@ -172,7 +179,7 @@ app.use((err, req, res, next) => {
 
 let server;
 
-if (require.main === module) {
+function startServer() {
   server = app.listen(PORT, () => {
     logger.info(`API Gateway listening on port ${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -180,22 +187,50 @@ if (require.main === module) {
     logger.info(`Video Service: ${VIDEO_SERVICE_URL}`);
     logger.info(`Status Service: ${STATUS_SERVICE_URL}`);
   });
+  return server;
 }
 
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
-  if (server) {
-    server.close(() => {
-      logger.info('HTTP server closed');
+function setupSIGTERMHandler() {
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received: closing HTTP server');
+    if (server) {
+      server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
-  } else {
-    process.exit(0);
+    }
+  });
+}
+
+function initialize() {
+  module.exports.startServer();
+  module.exports.setupSIGTERMHandler();
+}
+
+function runIfMain(mainModule) {
+  if (mainModule === module) {
+    module.exports.initialize();
+    return true;
   }
-});
+  return false;
+}
 
 function generateRequestId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+function getServer() {
+  return server;
+}
+
 module.exports = app;
+module.exports.startServer = startServer;
+module.exports.setupSIGTERMHandler = setupSIGTERMHandler;
+module.exports.initialize = initialize;
+module.exports.runIfMain = runIfMain;
+module.exports.generateRequestId = generateRequestId;
+module.exports.getServer = getServer;
+
+runIfMain(require.main);

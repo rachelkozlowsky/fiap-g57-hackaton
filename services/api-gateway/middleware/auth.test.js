@@ -43,6 +43,18 @@ describe('Auth Middleware', () => {
         expect(next).toHaveBeenCalled();
     });
 
+    it('should use sub field if user_id is not present', () => {
+        req.headers.authorization = 'Bearer valid-token';
+        const decoded = { sub: 'user456', email: 'sub@example.com' };
+        jwt.verify.mockReturnValue(decoded);
+
+        authMiddleware(req, res, next);
+
+        expect(req.user.id).toBe('user456');
+        expect(req.user.role).toBe('user');
+        expect(next).toHaveBeenCalled();
+    });
+
     it('should return 401 if token is expired', () => {
         req.headers.authorization = 'Bearer expired-token';
         const error = new Error('Expired');
