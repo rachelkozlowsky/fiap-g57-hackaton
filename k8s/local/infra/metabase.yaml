@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: metabase-data
+  namespace: g57
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metabase
+  namespace: g57
+  labels:
+    app: metabase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metabase
+  template:
+    metadata:
+      labels:
+        app: metabase
+    spec:
+      containers:
+        - name: metabase
+          image: metabase/metabase:v0.52.6
+          ports:
+            - containerPort: 3001
+          env:
+            - name: MB_JETTY_PORT
+              value: "3001"
+            - name: MB_DB_TYPE
+              value: postgres
+            - name: MB_DB_HOST
+              value: postgres
+            - name: MB_DB_PORT
+              value: "5432"
+            - name: MB_DB_DBNAME
+              value: metabase_db
+            - name: MB_DB_USER
+              value: metabase_user
+            - name: MB_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: metabase-db-password
+            - name: JAVA_TIMEZONE
+              value: America/Sao_Paulo
+          volumeMounts:
+            - name: metabase-data
+              mountPath: /metabase-data
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: metabase-data
+          persistentVolumeClaim:
+            claimName: metabase-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metabase
+  namespace: g57
+  labels:
+    app: metabase
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 3001
+      targetPort: 3001
+      nodePort: 30301
+  selector:
+    app: metabase

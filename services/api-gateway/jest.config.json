@@ -1,0 +1,20 @@
+{
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+        "server.js",
+        "middleware/**/*.js",
+        "!node_modules/**",
+        "!coverage/**"
+    ],
+    "coverageThreshold": {
+        "global": {
+            "branches": 90,
+            "functions": 90,
+            "lines": 90,
+            "statements": 90
+        }
+    },
+    "testTimeout": 10000,
+    "maxWorkers": 1
+}

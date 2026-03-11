@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+        }
+
+        .header {
+            background-color: #ef4444;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 0.8em;
+            color: #777;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Erro no Processamento ❌</h1>
+        </div>
+        <div class="content">
+            <p>Olá <strong>{{.UserName}}</strong>,</p>
+            <p>Infelizmente, ocorreu um erro ao processar o seu vídeo <strong>{{.VideoName}}</strong>.</p>
+            <p><strong>Detalhes do erro:</strong></p>
+            <p style="background-color: #fceceb; padding: 10px; border-left: 4px solid #ef4444;">{{.ErrorMessage}}</p>
+            <p>Por favor, tente enviar o vídeo novamente ou entre em contato com o suporte se o problema persistir.</p>
+        </div>
+        <div class="footer">
+            <p>Este é um email automático do G57. Por favor, não responda.</p>
+        </div>
+    </div>
+</body>
+
+</html>

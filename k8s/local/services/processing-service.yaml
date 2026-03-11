@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processing-service
+  namespace: g57
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: processing-service
+  template:
+    metadata:
+      labels:
+        app: processing-service
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: processing-db-password
+          command:
+            - sh
+            - -c
+            - |
+              until psql -h postgres -U processing_user -d processing_db -c "SELECT 1" > /dev/null 2>&1; do
+                echo "Aguardando banco de dados processing_db estar totalmente pronto..."
+                sleep 2
+              done
+              echo "Banco pronto! Limpando possível estado dirty de tentativas anteriores..."
+              psql -h postgres -U processing_user -d processing_db -c "UPDATE schema_migrations SET dirty = false WHERE version = 1;" || true
+      containers:
+        - name: processing-service
+          image: g57-processing-service:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-host
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-port
+            - name: DB_NAME
+              value: processing_db
+            - name: DB_USER
+              value: processing_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: processing-db-password
+            - name: RABBITMQ_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: rabbitmq-url
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-endpoint
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: minio-access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: minio-secret-key
+            - name: MINIO_USE_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-use-ssl
+            - name: MINIO_BUCKET_RAW
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-bucket-raw
+            - name: MINIO_BUCKET_PROCESSED
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: minio-bucket-processed
+            - name: WORKER_COUNT
+              value: "5"
+            - name: VIDEO_SERVICE_URL
+              value: http://video-service:8082
+          ports:
+            - containerPort: 8090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: processing-service
+  namespace: g57
+spec:
+  selector:
+    app: processing-service
+  ports:
+    - protocol: TCP
+      port: 8090
+      targetPort: 8090
