@@ -16,3 +16,12 @@ data:
   smtp-port: "587"
   smtp-from: "noreply@g57.com"
   notification-queue: "notification.queue"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-metrics
+  namespace: g57
+data:
+  metrics.txt: |
+    frontend_up 1

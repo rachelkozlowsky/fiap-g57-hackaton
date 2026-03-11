@@ -11,92 +11,105 @@ import (
 	"strings"
 	"testing"
 	"time"
+
 	"processing-service/domain"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type MockDatabase struct {
-	mock.Mock
+type MockDatabase struct{ mock.Mock }
+
+func (m *MockDatabase) CreateProcessingJob(job *domain.ProcessingJob) error {
+	return m.Called(job).Error(0)
+}
+func (m *MockDatabase) UpdateProcessingJob(job *domain.ProcessingJob) error {
+	return m.Called(job).Error(0)
 }
 
-func (m *MockDatabase) GetVideoByID(id string) (*domain.Video, error) {
-	args := m.Called(id)
+type MockVideoClient struct{ mock.Mock }
+
+func (m *MockVideoClient) GetVideoByID(videoID string) (*domain.Video, error) {
+	args := m.Called(videoID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Video), args.Error(1)
 }
-
-func (m *MockDatabase) UpdateVideo(video *domain.Video) error {
-	args := m.Called(video)
-	return args.Error(0)
+func (m *MockVideoClient) UpdateVideoStatus(videoID, status, errorMessage string) error {
+	return m.Called(videoID, status, errorMessage).Error(0)
+}
+func (m *MockVideoClient) CompleteVideo(videoID, zipPath string, zipSize int64, frameCount int) error {
+	return m.Called(videoID, zipPath, zipSize, frameCount).Error(0)
+}
+func (m *MockVideoClient) FailVideo(videoID, errorMessage string) error {
+	return m.Called(videoID, errorMessage).Error(0)
 }
 
-func (m *MockDatabase) CreateProcessingJob(job *domain.ProcessingJob) error {
-	args := m.Called(job)
-	return args.Error(0)
-}
-
-func (m *MockDatabase) UpdateProcessingJob(job *domain.ProcessingJob) error {
-	args := m.Called(job)
-	return args.Error(0)
-}
-
-type MockMinIO struct {
-	mock.Mock
-}
+type MockMinIO struct{ mock.Mock }
 
 func (m *MockMinIO) DownloadFile(objectName, destPath string) error {
-	args := m.Called(objectName, destPath)
-	return args.Error(0)
+	return m.Called(objectName, destPath).Error(0)
 }
-
 func (m *MockMinIO) UploadProcessedFile(reader io.Reader, filename string, size int64) (string, error) {
 	args := m.Called(reader, filename, size)
 	return args.String(0), args.Error(1)
 }
 
-type MockRabbitMQ struct {
-	mock.Mock
-}
+type MockRabbitMQ struct{ mock.Mock }
 
 func (m *MockRabbitMQ) PublishNotification(message domain.NotificationMessage) error {
-	args := m.Called(message)
-	return args.Error(0)
+	return m.Called(message).Error(0)
 }
-
 func (m *MockRabbitMQ) SubscribeVideoUpload() (<-chan amqp.Delivery, error) {
 	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(<-chan amqp.Delivery), args.Error(1)
 }
 
-type MockAcknowledger struct {
-	mock.Mock
-}
+type MockAcknowledger struct{ mock.Mock }
 
 func (m *MockAcknowledger) Ack(tag uint64, multiple bool) error {
-	args := m.Called(tag, multiple)
-	return args.Error(0)
+	return m.Called(tag, multiple).Error(0)
 }
-
 func (m *MockAcknowledger) Nack(tag uint64, multiple bool, requeue bool) error {
-	args := m.Called(tag, multiple, requeue)
-	return args.Error(0)
+	return m.Called(tag, multiple, requeue).Error(0)
+}
+func (m *MockAcknowledger) Reject(tag uint64, requeue bool) error {
+	return m.Called(tag, requeue).Error(0)
 }
 
-func (m *MockAcknowledger) Reject(tag uint64, requeue bool) error {
-	args := m.Called(tag, requeue)
-	return args.Error(0)
+// helper — injects nil for unused interfaces
+func newTestWorker(id int, db *MockDatabase, minio *MockMinIO, mq *MockRabbitMQ, vc *MockVideoClient) *Worker {
+	var dbI domain.DatabaseInterface
+	var minioI domain.MinIOInterface
+	var mqI domain.RabbitMQInterface
+	var vcI domain.VideoServiceClient
+	if db != nil {
+		dbI = db
+	}
+	if minio != nil {
+		minioI = minio
+	}
+	if mq != nil {
+		mqI = mq
+	}
+	if vc != nil {
+		vcI = vc
+	}
+	return NewWorker(id, dbI, minioI, mqI, vcI)
 }
+
+// ─── ffmpeg helper process ────────────────────────────────────────────────────
 
 func MockExecCommand(ctx context.Context, command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestHelperProcess", "--", command}
 	cs = append(cs, args...)
 	cmd := exec.Command(os.Args[0], cs...)
 	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-	
 	for _, arg := range args {
 		if strings.Contains(arg, "FAIL_FFMPEG") {
 			cmd.Env = append(cmd.Env, "FAIL_FFMPEG=1")
@@ -105,7 +118,6 @@ func MockExecCommand(ctx context.Context, command string, args ...string) *exec.
 			cmd.Env = append(cmd.Env, "EMPTY_FRAMES=1")
 		}
 	}
-	
 	return cmd
 }
 
@@ -113,16 +125,13 @@ func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
-	
 	if os.Getenv("FAIL_FFMPEG") == "1" {
 		os.Stderr.WriteString("ffmpeg error simulation")
 		os.Exit(1)
 	}
-
 	if os.Getenv("EMPTY_FRAMES") == "1" {
 		os.Exit(0)
 	}
-
 	args := os.Args
 	for i, arg := range args {
 		if arg == "--" && i+1 < len(args) && args[i+1] == "ffmpeg" {
@@ -139,86 +148,89 @@ func TestHelperProcess(t *testing.T) {
 			}
 		}
 	}
-	
 	os.Exit(0)
 }
 
-func TestProcessVideo_Success(t *testing.T) {
-	origExec := execCommand
-	execCommand = MockExecCommand
-	defer func() { execCommand = origExec }()
+// ─── NewWorker ────────────────────────────────────────────────────────────────
 
-	mockDB := new(MockDatabase)
-	mockMinio := new(MockMinIO)
-	mockRabbit := new(MockMockRabbitMQ)
-	_ = mockRabbit
-	mockRabbitReal := new(MockRabbitMQ)
-	worker := NewWorker(1, mockDB, mockMinio, mockRabbitReal)
-
-	videoID := "test-video-123"
-	userID := "user-123"
-	filename := "test.mp4"
-	storagePath := "raw/test.mp4"
-
-	video := &domain.Video{
-		ID:     videoID,
-		UserID: userID,
-		Status: "queued",
-	}
-
-	msg := &domain.VideoProcessingMessage{
-		VideoID:     videoID,
-		UserID:      userID,
-		Filename:    filename,
-		StoragePath: storagePath,
-	}
-
-	mockDB.On("GetVideoByID", videoID).Return(video, nil)
-	mockDB.On("UpdateVideo", mock.MatchedBy(func(v *domain.Video) bool { return v.Status == "processing" })).Return(nil).Once()
-	mockDB.On("CreateProcessingJob", mock.Anything).Return(nil)
-	mockMinio.On("DownloadFile", storagePath, mock.Anything).Return(nil)
-	
-	mockMinio.On("UploadProcessedFile", mock.Anything, mock.Anything, mock.Anything).Return("processed/test.zip", nil)
-	mockRabbitReal.On("PublishNotification", mock.Anything).Return(nil)
-	
-	mockDB.On("UpdateVideo", mock.MatchedBy(func(v *domain.Video) bool { return v.Status == "completed" })).Return(nil).Once()
-	mockDB.On("UpdateProcessingJob", mock.MatchedBy(func(j *domain.ProcessingJob) bool { return j.Status == "completed" })).Return(nil)
-
-	err := worker.processVideo(context.Background(), msg)
-
-	assert.NoError(t, err)
-	mockDB.AssertExpectations(t)
+func TestNewWorker(t *testing.T) {
+	w := newTestWorker(1, nil, nil, nil, nil)
+	assert.Equal(t, 1, w.ID)
 }
 
-type MockMockRabbitMQ = MockRabbitMQ 
+func TestNewWorker_MultipleIDs(t *testing.T) {
+	for id := 1; id <= 5; id++ {
+		w := newTestWorker(id, nil, nil, nil, nil)
+		assert.Equal(t, id, w.ID)
+	}
+}
+
+// ─── processVideo ─────────────────────────────────────────────────────────────
+
+func TestProcessVideo_GetVideoError(t *testing.T) {
+	db := new(MockDatabase)
+	vc := new(MockVideoClient)
+
+	vc.On("GetVideoByID", "v1").Return(nil, errors.New("not found"))
+
+	w := newTestWorker(1, db, nil, nil, vc)
+	err := w.processVideo(context.Background(), &domain.VideoProcessingMessage{VideoID: "v1"})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get video")
+}
+
+func TestProcessVideo_DownloadError(t *testing.T) {
+	db := new(MockDatabase)
+	minio := new(MockMinIO)
+	mq := new(MockRabbitMQ)
+	vc := new(MockVideoClient)
+
+	video := &domain.Video{ID: "v1", UserID: "u1", Status: "queued"}
+	vc.On("GetVideoByID", "v1").Return(video, nil)
+	vc.On("UpdateVideoStatus", "v1", "processing", "").Return(nil)
+	db.On("CreateProcessingJob", mock.Anything).Return(nil)
+	minio.On("DownloadFile", "s3/path", mock.Anything).Return(errors.New("download failed"))
+	db.On("UpdateProcessingJob", mock.Anything).Return(nil)
+	vc.On("FailVideo", "v1", mock.Anything).Return(nil)
+	mq.On("PublishNotification", mock.Anything).Return(nil)
+
+	w := newTestWorker(1, db, minio, mq, vc)
+	err := w.processVideo(context.Background(), &domain.VideoProcessingMessage{
+		VideoID: "v1", UserID: "u1", Filename: "v.mp4", StoragePath: "s3/path",
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to download video")
+}
 
 func TestProcessVideo_FFmpegError(t *testing.T) {
 	origExec := execCommand
 	execCommand = MockExecCommand
 	defer func() { execCommand = origExec }()
 
-	mockDB := new(MockDatabase)
-	mockMinio := new(MockMinIO)
-	mockRabbit := new(MockRabbitMQ)
-	worker := NewWorker(1, mockDB, mockMinio, mockRabbit)
+	db := new(MockDatabase)
+	minio := new(MockMinIO)
+	mq := new(MockRabbitMQ)
+	vc := new(MockVideoClient)
 
-	video := &domain.Video{ID: "v1", Status: "queued"}
-	msg := &domain.VideoProcessingMessage{VideoID: "v1", Filename: "FAIL_FFMPEG", StoragePath: "s"}
+	video := &domain.Video{ID: "v1", UserID: "u1", Status: "queued"}
+	vc.On("GetVideoByID", "v1").Return(video, nil)
+	vc.On("UpdateVideoStatus", "v1", "processing", "").Return(nil)
+	db.On("CreateProcessingJob", mock.Anything).Return(nil)
+	minio.On("DownloadFile", "s", mock.Anything).Return(nil)
+	db.On("UpdateProcessingJob", mock.Anything).Return(nil)
+	vc.On("FailVideo", "v1", mock.Anything).Return(nil)
+	mq.On("PublishNotification", mock.Anything).Return(nil)
 
-	mockDB.On("GetVideoByID", "v1").Return(video, nil)
-	mockDB.On("UpdateVideo", mock.Anything).Return(nil)
-	mockDB.On("CreateProcessingJob", mock.Anything).Return(nil)
-	mockMinio.On("DownloadFile", "s", mock.Anything).Return(nil)
-	
-	mockRabbit.On("PublishNotification", mock.Anything).Return(nil)
-	mockDB.On("UpdateProcessingJob", mock.Anything).Return(nil)
-	mockDB.On("UpdateVideo", mock.MatchedBy(func(v *domain.Video) bool { return v.Status == "failed" })).Return(nil)
-
-	err := worker.processVideo(context.Background(), msg)
+	w := newTestWorker(1, db, minio, mq, vc)
+	err := w.processVideo(context.Background(), &domain.VideoProcessingMessage{
+		VideoID: "v1", UserID: "u1", Filename: "FAIL_FFMPEG", StoragePath: "s",
+	})
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "ffmpeg failed")
-	mockDB.AssertExpectations(t)
+	db.AssertExpectations(t)
 }
 
 func TestProcessVideo_NoFramesError(t *testing.T) {
@@ -226,28 +238,142 @@ func TestProcessVideo_NoFramesError(t *testing.T) {
 	execCommand = MockExecCommand
 	defer func() { execCommand = origExec }()
 
-	mockDB := new(MockDatabase)
-	mockMinio := new(MockMinIO)
-	mockRabbit := new(MockRabbitMQ)
-	worker := NewWorker(1, mockDB, mockMinio, mockRabbit)
+	db := new(MockDatabase)
+	minio := new(MockMinIO)
+	mq := new(MockRabbitMQ)
+	vc := new(MockVideoClient)
 
-	video := &domain.Video{ID: "v1", Status: "queued"}
-	msg := &domain.VideoProcessingMessage{VideoID: "v1", Filename: "EMPTY_FRAMES", StoragePath: "s"}
+	video := &domain.Video{ID: "v1", UserID: "u1", Status: "queued"}
+	vc.On("GetVideoByID", "v1").Return(video, nil)
+	vc.On("UpdateVideoStatus", "v1", "processing", "").Return(nil)
+	db.On("CreateProcessingJob", mock.Anything).Return(nil)
+	minio.On("DownloadFile", "s", mock.Anything).Return(nil)
+	db.On("UpdateProcessingJob", mock.Anything).Return(nil)
+	vc.On("FailVideo", "v1", mock.Anything).Return(nil)
+	mq.On("PublishNotification", mock.Anything).Return(nil)
 
-	mockDB.On("GetVideoByID", "v1").Return(video, nil)
-	mockDB.On("UpdateVideo", mock.Anything).Return(nil)
-	mockDB.On("CreateProcessingJob", mock.Anything).Return(nil)
-	mockMinio.On("DownloadFile", "s", mock.Anything).Return(nil)
-	
-	mockRabbit.On("PublishNotification", mock.Anything).Return(nil)
-	mockDB.On("UpdateProcessingJob", mock.Anything).Return(nil)
-	mockDB.On("UpdateVideo", mock.MatchedBy(func(v *domain.Video) bool { return v.Status == "failed" })).Return(nil)
-
-	err := worker.processVideo(context.Background(), msg)
+	w := newTestWorker(1, db, minio, mq, vc)
+	err := w.processVideo(context.Background(), &domain.VideoProcessingMessage{
+		VideoID: "v1", UserID: "u1", Filename: "EMPTY_FRAMES", StoragePath: "s",
+	})
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no frames extracted")
-	mockDB.AssertExpectations(t)
+}
+
+func TestProcessVideo_UploadError(t *testing.T) {
+	origExec := execCommand
+	execCommand = MockExecCommand
+	defer func() { execCommand = origExec }()
+
+	db := new(MockDatabase)
+	minio := new(MockMinIO)
+	mq := new(MockRabbitMQ)
+	vc := new(MockVideoClient)
+
+	video := &domain.Video{ID: "v1", UserID: "u1", Status: "queued"}
+	vc.On("GetVideoByID", "v1").Return(video, nil)
+	vc.On("UpdateVideoStatus", "v1", "processing", "").Return(nil)
+	db.On("CreateProcessingJob", mock.Anything).Return(nil)
+	minio.On("DownloadFile", "s", mock.Anything).Return(nil)
+	minio.On("UploadProcessedFile", mock.Anything, mock.Anything, mock.Anything).Return("", errors.New("upload failed"))
+	db.On("UpdateProcessingJob", mock.Anything).Return(nil)
+	vc.On("FailVideo", "v1", mock.Anything).Return(nil)
+	mq.On("PublishNotification", mock.Anything).Return(nil)
+
+	w := newTestWorker(1, db, minio, mq, vc)
+	err := w.processVideo(context.Background(), &domain.VideoProcessingMessage{
+		VideoID: "v1", UserID: "u1", Filename: "test.mp4", StoragePath: "s",
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to upload zip")
+}
+
+func TestProcessVideo_Success(t *testing.T) {
+	origExec := execCommand
+	execCommand = MockExecCommand
+	defer func() { execCommand = origExec }()
+
+	db := new(MockDatabase)
+	minio := new(MockMinIO)
+	mq := new(MockRabbitMQ)
+	vc := new(MockVideoClient)
+
+	video := &domain.Video{ID: "v1", UserID: "u1", Status: "queued"}
+	vc.On("GetVideoByID", "v1").Return(video, nil)
+	vc.On("UpdateVideoStatus", "v1", "processing", "").Return(nil)
+	db.On("CreateProcessingJob", mock.Anything).Return(nil)
+	minio.On("DownloadFile", "s3/path", mock.Anything).Return(nil)
+	minio.On("UploadProcessedFile", mock.Anything, mock.Anything, mock.Anything).Return("processed/frames.zip", nil)
+	vc.On("CompleteVideo", "v1", "processed/frames.zip", mock.AnythingOfType("int64"), mock.AnythingOfType("int")).Return(nil)
+	db.On("UpdateProcessingJob", mock.Anything).Return(nil)
+	mq.On("PublishNotification", mock.Anything).Return(nil)
+
+	w := newTestWorker(1, db, minio, mq, vc)
+	err := w.processVideo(context.Background(), &domain.VideoProcessingMessage{
+		VideoID: "v1", UserID: "u1", Filename: "test.mp4", StoragePath: "s3/path",
+	})
+
+	assert.NoError(t, err)
+	db.AssertExpectations(t)
+	vc.AssertExpectations(t)
+	mq.AssertExpectations(t)
+}
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+
+func TestStart_UnmarshalError(t *testing.T) {
+	mq := new(MockRabbitMQ)
+	ack := new(MockAcknowledger)
+
+	msgs := make(chan amqp.Delivery, 1)
+	msgs <- amqp.Delivery{Body: []byte("invalid json"), Acknowledger: ack, DeliveryTag: 1}
+	close(msgs)
+
+	mq.On("SubscribeVideoUpload").Return((<-chan amqp.Delivery)(msgs), nil)
+	ack.On("Nack", uint64(1), false, false).Return(nil)
+
+	newTestWorker(1, nil, nil, mq, nil).Start(context.Background())
+
+	mq.AssertExpectations(t)
+	ack.AssertExpectations(t)
+}
+
+func TestStart_ProcessError_Nacked(t *testing.T) {
+	db := new(MockDatabase)
+	mq := new(MockRabbitMQ)
+	ack := new(MockAcknowledger)
+	vc := new(MockVideoClient)
+
+	vc.On("GetVideoByID", "v1").Return(nil, errors.New("not found"))
+
+	data, _ := json.Marshal(domain.VideoProcessingMessage{VideoID: "v1"})
+	msgs := make(chan amqp.Delivery, 1)
+	msgs <- amqp.Delivery{Body: data, Acknowledger: ack, DeliveryTag: 1}
+	close(msgs)
+
+	mq.On("SubscribeVideoUpload").Return((<-chan amqp.Delivery)(msgs), nil)
+	ack.On("Nack", uint64(1), false, true).Return(nil)
+
+	newTestWorker(1, db, nil, mq, vc).Start(context.Background())
+
+	mq.AssertExpectations(t)
+	ack.AssertExpectations(t)
+}
+
+func TestStart_ContextCancelled(t *testing.T) {
+	mq := new(MockRabbitMQ)
+
+	msgs := make(chan amqp.Delivery) // never receives
+	mq.On("SubscribeVideoUpload").Return((<-chan amqp.Delivery)(msgs), nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	newTestWorker(1, nil, nil, mq, nil).Start(ctx)
+
+	mq.AssertExpectations(t)
 }
 
 func TestStart_Success(t *testing.T) {
@@ -255,136 +381,142 @@ func TestStart_Success(t *testing.T) {
 	execCommand = MockExecCommand
 	defer func() { execCommand = origExec }()
 
-	mockDB := new(MockDatabase)
-	mockMinio := new(MockMinIO)
-	mockRabbit := new(MockRabbitMQ)
-	mockAck := new(MockAcknowledger)
-	worker := NewWorker(1, mockDB, mockMinio, mockRabbit)
+	db := new(MockDatabase)
+	minio := new(MockMinIO)
+	mq := new(MockRabbitMQ)
+	ack := new(MockAcknowledger)
+	vc := new(MockVideoClient)
 
-	msgs := make(chan amqp.Delivery, 1)
-	
+	video := &domain.Video{ID: "v1", UserID: "u1", Status: "queued"}
+	vc.On("GetVideoByID", "v1").Return(video, nil)
+	vc.On("UpdateVideoStatus", "v1", "processing", "").Return(nil)
+	db.On("CreateProcessingJob", mock.Anything).Return(nil)
+	minio.On("DownloadFile", "s", mock.Anything).Return(nil)
+	minio.On("UploadProcessedFile", mock.Anything, mock.Anything, mock.Anything).Return("zip/path", nil)
+	vc.On("CompleteVideo", "v1", "zip/path", mock.AnythingOfType("int64"), mock.AnythingOfType("int")).Return(nil)
+	db.On("UpdateProcessingJob", mock.Anything).Return(nil)
+	mq.On("PublishNotification", mock.Anything).Return(nil)
+	ack.On("Ack", uint64(1), false).Return(nil)
+
 	data, _ := json.Marshal(domain.VideoProcessingMessage{
-		VideoID: "v1", Filename: "test.mp4", StoragePath: "s",
+		VideoID: "v1", UserID: "u1", Filename: "test.mp4", StoragePath: "s",
 	})
-
-	delivery := amqp.Delivery{
-		Body: data,
-		Acknowledger: mockAck,
-		DeliveryTag: 1,
-	}
-	msgs <- delivery
+	msgs := make(chan amqp.Delivery, 1)
+	msgs <- amqp.Delivery{Body: data, Acknowledger: ack, DeliveryTag: 1}
 	close(msgs)
 
-	mockRabbit.On("SubscribeVideoUpload").Return((<-chan amqp.Delivery)(msgs), nil)
-	
-	video := &domain.Video{ID: "v1", Status: "queued"}
-	mockDB.On("GetVideoByID", "v1").Return(video, nil)
-	mockDB.On("UpdateVideo", mock.Anything).Return(nil)
-	mockDB.On("CreateProcessingJob", mock.Anything).Return(nil)
-	mockMinio.On("DownloadFile", "s", mock.Anything).Return(nil)
-	mockMinio.On("UploadProcessedFile", mock.Anything, mock.Anything, mock.Anything).Return("zip", nil)
-	mockRabbit.On("PublishNotification", mock.Anything).Return(nil)
-	mockDB.On("UpdateProcessingJob", mock.Anything).Return(nil)
-	
-	mockAck.On("Ack", uint64(1), false).Return(nil)
+	mq.On("SubscribeVideoUpload").Return((<-chan amqp.Delivery)(msgs), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		cancel()
 	}()
 
-	worker.Start(ctx)
+	newTestWorker(1, db, minio, mq, vc).Start(ctx)
 
-	mockRabbit.AssertExpectations(t)
-	mockAck.AssertExpectations(t)
+	mq.AssertExpectations(t)
+	ack.AssertExpectations(t)
+	vc.AssertExpectations(t)
 }
 
-func TestStart_UnmarshalError(t *testing.T) {
-	mockRabbit := new(MockRabbitMQ)
-	mockAck := new(MockAcknowledger)
-	worker := NewWorker(1, nil, nil, mockRabbit)
-
-	msgs := make(chan amqp.Delivery, 1)
-	delivery := amqp.Delivery{
-		Body: []byte("invalid json"),
-		Acknowledger: mockAck,
-		DeliveryTag: 1,
-	}
-	msgs <- delivery
-	close(msgs)
-
-	mockRabbit.On("SubscribeVideoUpload").Return((<-chan amqp.Delivery)(msgs), nil)
-	mockAck.On("Nack", uint64(1), false, false).Return(nil)
-
-	worker.Start(context.Background())
-
-	mockRabbit.AssertExpectations(t)
-	mockAck.AssertExpectations(t)
-}
-
-func TestStart_ProcessError(t *testing.T) {
-	mockDB := new(MockDatabase)
-	mockRabbit := new(MockRabbitMQ)
-	mockAck := new(MockAcknowledger)
-	worker := NewWorker(1, mockDB, nil, mockRabbit)
-
-	msgs := make(chan amqp.Delivery, 1)
-	data, _ := json.Marshal(domain.VideoProcessingMessage{VideoID: "v1"})
-	delivery := amqp.Delivery{
-		Body: data,
-		Acknowledger: mockAck,
-		DeliveryTag: 1,
-	}
-	msgs <- delivery
-	close(msgs)
-
-	mockRabbit.On("SubscribeVideoUpload").Return((<-chan amqp.Delivery)(msgs), nil)
-	mockDB.On("GetVideoByID", "v1").Return(nil, errors.New("db error"))
-	mockAck.On("Nack", uint64(1), false, true).Return(nil)
-
-	worker.Start(context.Background())
-
-	mockRabbit.AssertExpectations(t)
-	mockAck.AssertExpectations(t)
-}
+// ─── updateJobFailed ──────────────────────────────────────────────────────────
 
 func TestUpdateJobFailed(t *testing.T) {
-	mockDB := new(MockDatabase)
-	worker := NewWorker(1, mockDB, nil, nil)
-	
-	job := &domain.ProcessingJob{ID: "j1", Status: "running"}
-	testErr := errors.New("test error")
-	
-	mockDB.On("UpdateProcessingJob", mock.MatchedBy(func(j *domain.ProcessingJob) bool {
-		return j.Status == "failed" && *j.ErrorMessage == "test error"
+	db := new(MockDatabase)
+	db.On("UpdateProcessingJob", mock.MatchedBy(func(j *domain.ProcessingJob) bool {
+		return j.Status == "failed" && j.ErrorMessage != nil && *j.ErrorMessage == "test error"
 	})).Return(nil)
-	
-	worker.updateJobFailed(job, testErr)
-	mockDB.AssertExpectations(t)
+
+	w := newTestWorker(1, db, nil, nil, nil)
+	w.updateJobFailed(&domain.ProcessingJob{ID: "j1", Status: "running"}, errors.New("test error"))
+
+	db.AssertExpectations(t)
 }
 
+// ─── updateVideoFailed ────────────────────────────────────────────────────────
+
 func TestUpdateVideoFailed(t *testing.T) {
-	mockDB := new(MockDatabase)
-	mockRabbit := new(MockRabbitMQ)
-	worker := NewWorker(1, mockDB, nil, mockRabbit)
-	
-	video := &domain.Video{ID: "v1", UserID: "u1", Status: "processing"}
-	testErr := errors.New("test error")
-	
-	mockDB.On("UpdateVideo", mock.MatchedBy(func(v *domain.Video) bool {
-		return v.Status == "failed" && *v.ErrorMessage == "test error"
-	})).Return(nil)
-	
-	mockRabbit.On("PublishNotification", mock.Anything).Return(nil)
-	
-	worker.updateVideoFailed(video, testErr)
-	mockDB.AssertExpectations(t)
+	mq := new(MockRabbitMQ)
+	vc := new(MockVideoClient)
+
+	vc.On("FailVideo", "v1", "test error").Return(nil)
+	mq.On("PublishNotification", mock.Anything).Return(nil)
+
+	w := newTestWorker(1, nil, nil, mq, vc)
+	w.updateVideoFailed(&domain.Video{ID: "v1", UserID: "u1"}, errors.New("test error"))
+
+	vc.AssertExpectations(t)
+	mq.AssertExpectations(t)
 }
+
+func TestUpdateVideoFailed_FailVideoError(t *testing.T) {
+	mq := new(MockRabbitMQ)
+	vc := new(MockVideoClient)
+
+	vc.On("FailVideo", "v1", "boom").Return(errors.New("http error"))
+	mq.On("PublishNotification", mock.Anything).Return(nil)
+
+	w := newTestWorker(1, nil, nil, mq, vc)
+	w.updateVideoFailed(&domain.Video{ID: "v1", UserID: "u1"}, errors.New("boom"))
+
+	vc.AssertExpectations(t)
+	mq.AssertExpectations(t)
+}
+
+// ─── createZipFile / addFileToZip ─────────────────────────────────────────────
+
+func TestCreateZipFile_Success(t *testing.T) {
+	w := newTestWorker(1, nil, nil, nil, nil)
+	tempDir, _ := os.MkdirTemp("", "zip-test")
+	defer os.RemoveAll(tempDir)
+
+	f1 := filepath.Join(tempDir, "1.txt")
+	os.WriteFile(f1, []byte("test content"), 0644)
+
+	zipPath := filepath.Join(tempDir, "out.zip")
+	err := w.createZipFile([]string{f1}, zipPath)
+
+	assert.NoError(t, err)
+	_, statErr := os.Stat(zipPath)
+	assert.NoError(t, statErr)
+}
+
+func TestCreateZipFile_InvalidDestination(t *testing.T) {
+	w := newTestWorker(1, nil, nil, nil, nil)
+	err := w.createZipFile([]string{"notexist.txt"}, "/no/such/dir/out.zip")
+	assert.Error(t, err)
+}
+
+func TestCreateZipFile_MissingSourceFile(t *testing.T) {
+	w := newTestWorker(1, nil, nil, nil, nil)
+	tempDir, _ := os.MkdirTemp("", "zip-test")
+	defer os.RemoveAll(tempDir)
+
+	zipPath := filepath.Join(tempDir, "out.zip")
+	err := w.createZipFile([]string{"/no/such/file.txt"}, zipPath)
+	assert.Error(t, err)
+}
+
+func TestAddFileToZip_Error(t *testing.T) {
+	w := newTestWorker(1, nil, nil, nil, nil)
+	err := w.addFileToZip(nil, "nonexistent.png")
+	assert.Error(t, err)
+}
+
+// ─── helper functions ─────────────────────────────────────────────────────────
 
 func TestGenerateID(t *testing.T) {
 	id := generateID()
 	assert.Len(t, id, 36)
+}
+
+func TestGenerateID_Unique(t *testing.T) {
+	ids := make(map[string]bool, 100)
+	for i := 0; i < 100; i++ {
+		ids[generateID()] = true
+	}
+	assert.Len(t, ids, 100)
 }
 
 func TestTimePtr(t *testing.T) {
@@ -394,40 +526,7 @@ func TestTimePtr(t *testing.T) {
 }
 
 func TestStringPtr(t *testing.T) {
-	s := "test"
+	s := "hello"
 	ptr := stringPtr(s)
 	assert.Equal(t, s, *ptr)
-}
-
-func TestNewWorker(t *testing.T) {
-	w := NewWorker(1, nil, nil, nil)
-	assert.Equal(t, 1, w.ID)
-}
-
-func TestCreateZipFile_Success(t *testing.T) {
-	worker := NewWorker(1, nil, nil, nil)
-	tempDir, _ := os.MkdirTemp("", "zip-test")
-	defer os.RemoveAll(tempDir)
-	
-	f1 := filepath.Join(tempDir, "1.txt")
-	os.WriteFile(f1, []byte("test"), 0644)
-	
-	zipPath := filepath.Join(tempDir, "test.zip")
-	err := worker.createZipFile([]string{f1}, zipPath)
-	
-	assert.NoError(t, err)
-	_, err = os.Stat(zipPath)
-	assert.NoError(t, err)
-}
-
-func TestCreateZipFile_Error(t *testing.T) {
-	worker := NewWorker(1, nil, nil, nil)
-	err := worker.createZipFile([]string{"nonexistent"}, "/invalid/path")
-	assert.Error(t, err)
-}
-
-func TestAddFileToZip_Error(t *testing.T) {
-	worker := NewWorker(1, nil, nil, nil)
-	err := worker.addFileToZip(nil, "nonexistent")
-	assert.Error(t, err)
 }

@@ -7,6 +7,9 @@
 *.seed
 *.pid.lock
 
+
+
+
 .idea/
 .vscode/
 *.swp
@@ -31,6 +34,7 @@ vendor/
 
 go.work
 
+coverage/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -83,3 +87,7 @@ __MACOSX/
 main.go.old
 Dockerfile.old
 docs/
+
+# SonarQube
+.sonar_lock
+.scannerwork/

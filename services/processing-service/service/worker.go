@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 	"processing-service/domain"
 	"processing-service/infra/utils"
@@ -67,7 +68,14 @@ func (w *Worker) Start(ctx context.Context) {
 
 			if err != nil {
 				log.Printf("Worker %d: Error processing video %s: %v", w.ID, message.VideoID, err)
-				msg.Nack(false, true)
+				// If the video record doesn't exist in the Video Service (404), discard the
+				// message instead of requeuing to avoid an infinite retry loop.
+				if strings.Contains(err.Error(), "status code 404") || strings.Contains(err.Error(), "Video not found") {
+					log.Printf("Worker %d: Video %s not found in Video Service, discarding message", w.ID, message.VideoID)
+					msg.Nack(false, false)
+				} else {
+					msg.Nack(false, true)
+				}
 			} else {
 				log.Printf("Worker %d: Successfully processed video %s", w.ID, message.VideoID)
 				msg.Ack(false)

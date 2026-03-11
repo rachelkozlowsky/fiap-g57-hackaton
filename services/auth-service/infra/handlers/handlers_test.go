@@ -489,7 +489,7 @@ func TestLogout_Success(t *testing.T) {
 }
 
 func TestGetCurrentUser_Success(t *testing.T) {
-	router, mockDB, mockRedis := setupTestRouter()
+	_, mockDB, mockRedis := setupTestRouter()
 	
 	user := &domain.User{
 		ID:    "123",
@@ -525,7 +525,7 @@ func TestGetCurrentUser_Success(t *testing.T) {
 }
 
 func TestGetCurrentUser_FromCache(t *testing.T) {
-	router, _, mockRedis := setupTestRouter()
+	_, _, mockRedis := setupTestRouter()
 	
 	user := &domain.User{
 		ID:    "123",

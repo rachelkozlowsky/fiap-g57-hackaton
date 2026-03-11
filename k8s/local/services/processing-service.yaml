@@ -38,11 +38,11 @@ spec:
           imagePullPolicy: IfNotPresent
           resources:
             requests:
-              memory: "64Mi"
-              cpu: "100m"
+              memory: "256Mi"
+              cpu: "250m"
             limits:
-              memory: "128Mi"
-              cpu: "200m"
+              memory: "1Gi"
+              cpu: "1000m"
           env:
             - name: DB_HOST
               valueFrom:

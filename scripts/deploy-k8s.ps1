@@ -1,17 +1,17 @@
 
 Write-Host "Configurando Namespace..."
-kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/local/namespace.yaml
 
 Write-Host "Aplicando ConfigMaps e Secrets..."
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secrets.yaml
-kubectl apply -f k8s/postgres-init.yaml
+kubectl apply -f k8s/local/configmap.yaml
+kubectl apply -f k8s/local/secrets.yaml
+kubectl apply -f k8s/local/postgres-init.yaml
 
 Write-Host "Iniciando Infraestrutura Base..."
-kubectl apply -f k8s/infra/postgres.yaml
-kubectl apply -f k8s/infra/redis.yaml
-kubectl apply -f k8s/infra/rabbitmq.yaml
-kubectl apply -f k8s/infra/minio.yaml
+kubectl apply -f k8s/local/infra/postgres.yaml
+kubectl apply -f k8s/local/infra/redis.yaml
+kubectl apply -f k8s/local/infra/rabbitmq.yaml
+kubectl apply -f k8s/local/infra/minio.yaml
 
 Write-Host "Aguardando inicialização da infraestrutura (RabbitMQ, Postgres, etc)..."
 kubectl rollout status deployment/rabbitmq -n g57 --timeout=120s
@@ -20,13 +20,13 @@ kubectl rollout status deployment/redis -n g57 --timeout=120s
 kubectl rollout status deployment/minio -n g57 --timeout=120s
 
 Write-Host "Iniciando Microsserviços..."
-kubectl apply -f k8s/services/auth-service.yaml
-kubectl apply -f k8s/services/video-service.yaml
-kubectl apply -f k8s/services/processing-service.yaml
-kubectl apply -f k8s/services/status-service.yaml
-kubectl apply -f k8s/services/notification-service.yaml
-kubectl apply -f k8s/services/api-gateway.yaml
-kubectl apply -f k8s/services/frontend.yaml
+kubectl apply -f k8s/local/services/auth-service.yaml
+kubectl apply -f k8s/local/services/video-service.yaml
+kubectl apply -f k8s/local/services/processing-service.yaml
+kubectl apply -f k8s/local/services/status-service.yaml
+kubectl apply -f k8s/local/services/notification-service.yaml
+kubectl apply -f k8s/local/services/api-gateway.yaml
+kubectl apply -f k8s/local/services/frontend.yaml
 
 Write-Host "Deseja buildar as imagens localmente? (S/N)"
 $response = Read-Host
