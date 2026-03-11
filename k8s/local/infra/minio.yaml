@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: g57
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+            - containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              value: g57
+            - name: MINIO_ROOT_PASSWORD
+              value: g57123456
+            - name: MINIO_SERVER_URL
+              value: http://minio:9000
+          volumeMounts:
+            - name: minio-storage
+              mountPath: /data
+      volumes:
+        - name: minio-storage
+          persistentVolumeClaim:
+            claimName: minio-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: g57
+spec:
+  selector:
+    app: minio
+  type: NodePort
+  ports:
+    - name: api
+      protocol: TCP
+      port: 9000
+      targetPort: 9000
+    - name: console
+      protocol: TCP
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: g57
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init-buckets
+  namespace: g57
+spec:
+  template:
+    spec:
+      containers:
+      - name: minio-mc
+        image: minio/mc
+        env:
+        - name: MINIO_ENDPOINT
+          value: minio
+        - name: MINIO_ACCESS_KEY
+          value: g57
+        - name: MINIO_SECRET_KEY
+          value: g57123456
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          # Aguarda o MinIO iniciar
+          until mc alias set myminio http://$MINIO_ENDPOINT:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY; do
+            echo "Aguardando MinIO estar pronto..."
+            sleep 2
+          done
+          
+          # Cria os buckets se não existirem
+          mc mb myminio/videos-raw --ignore-existing
+          mc mb myminio/videos-processed --ignore-existing
+          
+          # Define politicas de acesso (opcional, mas util para visualização)
+          mc anonymous set public myminio/videos-raw
+          mc anonymous set public myminio/videos-processed
+          
+          echo "Buckets configurados com sucesso!"
+      restartPolicy: OnFailure

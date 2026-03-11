@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metabase-seed-scripts
+  namespace: g57
+data:
+  seed.sh: |
+    #!/bin/sh
+    set -e
+    echo "Aguardando PostgreSQL..."
+    until pg_isready -h postgres -U postgres; do sleep 2; done
+    echo "PostgreSQL pronto. Iniciando seed..."
+
+    # ─── AUTH DB: users ───────────────────────────────────────────────────────
+    psql -h postgres -U postgres -d auth_db <<'EOSQL'
+    INSERT INTO users (id, email, password_hash, name, role, is_active, email_verified, created_at, last_login_at) VALUES
+      ('a1000000-0000-0000-0000-000000000001', 'ana.souza@email.com',    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Ana Souza',     'user',  true,  true,  NOW() - INTERVAL '60 days', NOW() - INTERVAL '1 hour'),
+      ('a1000000-0000-0000-0000-000000000002', 'carlos.lima@email.com',  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Carlos Lima',   'user',  true,  true,  NOW() - INTERVAL '55 days', NOW() - INTERVAL '2 hours'),
+      ('a1000000-0000-0000-0000-000000000003', 'beatriz.costa@email.com','$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Beatriz Costa', 'user',  true,  true,  NOW() - INTERVAL '45 days', NOW() - INTERVAL '5 hours'),
+      ('a1000000-0000-0000-0000-000000000004', 'diego.farias@email.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Diego Farias',  'user',  true,  true,  NOW() - INTERVAL '40 days', NOW() - INTERVAL '1 day'),
+      ('a1000000-0000-0000-0000-000000000005', 'elena.matos@email.com',  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Elena Matos',   'user',  true,  false, NOW() - INTERVAL '30 days', NOW() - INTERVAL '3 days'),
+      ('a1000000-0000-0000-0000-000000000006', 'felipe.nunes@email.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Felipe Nunes',  'user',  true,  true,  NOW() - INTERVAL '20 days', NOW() - INTERVAL '6 hours'),
+      ('a1000000-0000-0000-0000-000000000007', 'gabi.rocha@email.com',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Gabriela Rocha','user',  true,  true,  NOW() - INTERVAL '15 days', NOW() - INTERVAL '30 minutes'),
+      ('a1000000-0000-0000-0000-000000000008', 'henrique.ti@email.com',  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Henrique TI',   'admin', true,  true,  NOW() - INTERVAL '90 days', NOW() - INTERVAL '10 minutes'),
+      ('a1000000-0000-0000-0000-000000000009', 'iris.pedro@email.com',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'Iris Pedro',    'user',  false, false, NOW() - INTERVAL '10 days', NULL),
+      ('a1000000-0000-0000-0000-000000000010', 'joao.mendes@email.com',  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIr.3e.8W2', 'João Mendes',   'user',  true,  true,  NOW() - INTERVAL '5 days',  NOW() - INTERVAL '2 hours')
+    ON CONFLICT (email) DO NOTHING;
+
+    INSERT INTO audit_logs (user_id, action, entity_type, entity_id, ip_address, user_agent, created_at) VALUES
+      ('a1000000-0000-0000-0000-000000000001', 'login',       'user',  'a1000000-0000-0000-0000-000000000001', '192.168.1.10', 'Mozilla/5.0', NOW() - INTERVAL '1 hour'),
+      ('a1000000-0000-0000-0000-000000000002', 'login',       'user',  'a1000000-0000-0000-0000-000000000002', '192.168.1.11', 'Chrome/120',  NOW() - INTERVAL '2 hours'),
+      ('a1000000-0000-0000-0000-000000000001', 'upload_video','video', gen_random_uuid(),                       '192.168.1.10', 'Mozilla/5.0', NOW() - INTERVAL '50 minutes'),
+      ('a1000000-0000-0000-0000-000000000003', 'login',       'user',  'a1000000-0000-0000-0000-000000000003', '10.0.0.5',     'Safari/17',   NOW() - INTERVAL '5 hours'),
+      ('a1000000-0000-0000-0000-000000000004', 'upload_video','video', gen_random_uuid(),                       '10.0.0.8',     'Chrome/120',  NOW() - INTERVAL '1 day'),
+      ('a1000000-0000-0000-0000-000000000005', 'register',    'user',  'a1000000-0000-0000-0000-000000000005', '172.16.0.3',   'Firefox/121', NOW() - INTERVAL '30 days'),
+      ('a1000000-0000-0000-0000-000000000006', 'login',       'user',  'a1000000-0000-0000-0000-000000000006', '192.168.2.20', 'Edge/120',    NOW() - INTERVAL '6 hours'),
+      ('a1000000-0000-0000-0000-000000000007', 'upload_video','video', gen_random_uuid(),                       '192.168.2.21', 'Mozilla/5.0', NOW() - INTERVAL '30 minutes'),
+      ('a1000000-0000-0000-0000-000000000008', 'admin_action','user',  'a1000000-0000-0000-0000-000000000009', '192.168.0.1',  'Chrome/120',  NOW() - INTERVAL '10 minutes'),
+      ('a1000000-0000-0000-0000-000000000010', 'login',       'user',  'a1000000-0000-0000-0000-000000000010', '10.10.0.5',    'Chrome/120',  NOW() - INTERVAL '2 hours');
+    EOSQL
+
+    # ─── VIDEO DB: videos ─────────────────────────────────────────────────────
+    psql -h postgres -U postgres -d video_db <<'EOSQL'
+    INSERT INTO videos (id, user_id, filename, original_name, size_bytes, duration_seconds, status, storage_path, zip_path, zip_size_bytes, frame_count, retry_count, priority, created_at, queued_at, processing_started_at, processing_completed_at) VALUES
+      -- Ana: 8 vídeos
+      ('b1000000-0000-0000-0000-000000000001','a1000000-0000-0000-0000-000000000001','vid_001.mp4','reuniao_sprint.mp4',  52428800,  120.5,'completed','videos/vid_001.mp4','zips/vid_001.zip', 18874368, 3613, 0,5, NOW()-INTERVAL '25 days', NOW()-INTERVAL '25 days'+INTERVAL '1 min', NOW()-INTERVAL '25 days'+INTERVAL '3 min', NOW()-INTERVAL '25 days'+INTERVAL '5 min'),
+      ('b1000000-0000-0000-0000-000000000002','a1000000-0000-0000-0000-000000000001','vid_002.mp4','demo_produto.mp4',   104857600, 240.0,'completed','videos/vid_002.mp4','zips/vid_002.zip', 41943040, 7200, 0,5, NOW()-INTERVAL '20 days', NOW()-INTERVAL '20 days'+INTERVAL '2 min', NOW()-INTERVAL '20 days'+INTERVAL '4 min', NOW()-INTERVAL '20 days'+INTERVAL '12 min'),
+      ('b1000000-0000-0000-0000-000000000003','a1000000-0000-0000-0000-000000000001','vid_003.mp4','treinamento.mp4',    209715200, 480.0,'completed','videos/vid_003.mp4','zips/vid_003.zip', 83886080, 14400,0,7, NOW()-INTERVAL '18 days', NOW()-INTERVAL '18 days'+INTERVAL '1 min', NOW()-INTERVAL '18 days'+INTERVAL '2 min', NOW()-INTERVAL '18 days'+INTERVAL '25 min'),
+      ('b1000000-0000-0000-0000-000000000004','a1000000-0000-0000-0000-000000000001','vid_004.mp4','entrevista.mp4',     31457280,   60.0,'failed',   'videos/vid_004.mp4', NULL,               NULL,      NULL, 3,4, NOW()-INTERVAL '15 days', NOW()-INTERVAL '15 days'+INTERVAL '1 min', NOW()-INTERVAL '15 days'+INTERVAL '3 min', NULL),
+      ('b1000000-0000-0000-0000-000000000005','a1000000-0000-0000-0000-000000000001','vid_005.mp4','webinar_jan.mp4',    524288000, 900.0,'completed','videos/vid_005.mp4','zips/vid_005.zip',188743680, 27000,0,8, NOW()-INTERVAL '10 days', NOW()-INTERVAL '10 days'+INTERVAL '1 min', NOW()-INTERVAL '10 days'+INTERVAL '5 min', NOW()-INTERVAL '10 days'+INTERVAL '55 min'),
+      ('b1000000-0000-0000-0000-000000000006','a1000000-0000-0000-0000-000000000001','vid_006.mp4','pitch_deck.mp4',     15728640,   30.0,'completed','videos/vid_006.mp4','zips/vid_006.zip',  5242880,  900, 0,6, NOW()-INTERVAL '5 days',  NOW()-INTERVAL '5 days' +INTERVAL '1 min', NOW()-INTERVAL '5 days' +INTERVAL '2 min', NOW()-INTERVAL '5 days' +INTERVAL '4 min'),
+      ('b1000000-0000-0000-0000-000000000007','a1000000-0000-0000-0000-000000000001','vid_007.mp4','aula_online.mp4',    157286400, 360.0,'processing','videos/vid_007.mp4', NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '30 minutes', NOW()-INTERVAL '25 minutes', NOW()-INTERVAL '10 minutes', NULL),
+      ('b1000000-0000-0000-0000-000000000008','a1000000-0000-0000-0000-000000000001','vid_008.mp4','reuniao_geral.mp4',  78643200,  180.0,'pending',  NULL,                 NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '5 minutes', NULL, NULL, NULL),
+      -- Carlos: 6 vídeos
+      ('b1000000-0000-0000-0000-000000000009','a1000000-0000-0000-0000-000000000002','vid_009.mp4','apresentacao.mp4',   62914560,  150.0,'completed','videos/vid_009.mp4','zips/vid_009.zip', 22020096, 4500, 0,5, NOW()-INTERVAL '22 days', NOW()-INTERVAL '22 days'+INTERVAL '1 min', NOW()-INTERVAL '22 days'+INTERVAL '3 min', NOW()-INTERVAL '22 days'+INTERVAL '10 min'),
+      ('b1000000-0000-0000-0000-000000000010','a1000000-0000-0000-0000-000000000002','vid_010.mp4','tutorial_git.mp4',   83886080,  200.0,'completed','videos/vid_010.mp4','zips/vid_010.zip', 29360128, 6000, 0,5, NOW()-INTERVAL '17 days', NOW()-INTERVAL '17 days'+INTERVAL '2 min', NOW()-INTERVAL '17 days'+INTERVAL '4 min', NOW()-INTERVAL '17 days'+INTERVAL '15 min'),
+      ('b1000000-0000-0000-0000-000000000011','a1000000-0000-0000-0000-000000000002','vid_011.mp4','review_code.mp4',    41943040,  100.0,'failed',   'videos/vid_011.mp4', NULL,               NULL,      NULL, 2,5, NOW()-INTERVAL '12 days', NOW()-INTERVAL '12 days'+INTERVAL '1 min', NOW()-INTERVAL '12 days'+INTERVAL '2 min', NULL),
+      ('b1000000-0000-0000-0000-000000000012','a1000000-0000-0000-0000-000000000002','vid_012.mp4','demo_api.mp4',       26214400,   60.0,'completed','videos/vid_012.mp4','zips/vid_012.zip',  8388608, 1800, 0,6, NOW()-INTERVAL '8 days',  NOW()-INTERVAL '8 days' +INTERVAL '1 min', NOW()-INTERVAL '8 days' +INTERVAL '2 min', NOW()-INTERVAL '8 days' +INTERVAL '5 min'),
+      ('b1000000-0000-0000-0000-000000000013','a1000000-0000-0000-0000-000000000002','vid_013.mp4','devops_talk.mp4',   314572800, 600.0,'queued',    'videos/vid_013.mp4', NULL,               NULL,      NULL, 0,7, NOW()-INTERVAL '2 hours', NOW()-INTERVAL '90 minutes', NULL, NULL),
+      ('b1000000-0000-0000-0000-000000000014','a1000000-0000-0000-0000-000000000002','vid_014.mp4','kubernetes101.mp4',  52428800,  120.0,'pending',  NULL,                 NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '10 minutes', NULL, NULL, NULL),
+      -- Beatriz: 5 vídeos
+      ('b1000000-0000-0000-0000-000000000015','a1000000-0000-0000-0000-000000000003','vid_015.mp4','ux_research.mp4',    73400320,  175.0,'completed','videos/vid_015.mp4','zips/vid_015.zip', 25690112, 5250, 0,5, NOW()-INTERVAL '28 days', NOW()-INTERVAL '28 days'+INTERVAL '1 min', NOW()-INTERVAL '28 days'+INTERVAL '2 min', NOW()-INTERVAL '28 days'+INTERVAL '13 min'),
+      ('b1000000-0000-0000-0000-000000000016','a1000000-0000-0000-0000-000000000003','vid_016.mp4','wireframe_review.mp4',20971520,  50.0,'completed','videos/vid_016.mp4','zips/vid_016.zip',  7340032,  1500, 0,5, NOW()-INTERVAL '21 days', NOW()-INTERVAL '21 days'+INTERVAL '1 min', NOW()-INTERVAL '21 days'+INTERVAL '2 min', NOW()-INTERVAL '21 days'+INTERVAL '4 min'),
+      ('b1000000-0000-0000-0000-000000000017','a1000000-0000-0000-0000-000000000003','vid_017.mp4','usability_test.mp4', 94371840,  220.0,'failed',   'videos/vid_017.mp4', NULL,               NULL,      NULL, 1,5, NOW()-INTERVAL '14 days', NOW()-INTERVAL '14 days'+INTERVAL '2 min', NOW()-INTERVAL '14 days'+INTERVAL '4 min', NULL),
+      ('b1000000-0000-0000-0000-000000000018','a1000000-0000-0000-0000-000000000003','vid_018.mp4','design_system.mp4', 157286400, 350.0,'completed','videos/vid_018.mp4','zips/vid_018.zip', 55050240, 10500,0,6, NOW()-INTERVAL '7 days',  NOW()-INTERVAL '7 days' +INTERVAL '1 min', NOW()-INTERVAL '7 days' +INTERVAL '3 min', NOW()-INTERVAL '7 days' +INTERVAL '28 min'),
+      ('b1000000-0000-0000-0000-000000000019','a1000000-0000-0000-0000-000000000003','vid_019.mp4','sprint_review.mp4',  47185920,  110.0,'queued',   'videos/vid_019.mp4', NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '1 hour',  NOW()-INTERVAL '45 minutes', NULL, NULL),
+      -- Diego: 4 vídeos
+      ('b1000000-0000-0000-0000-000000000020','a1000000-0000-0000-0000-000000000004','vid_020.mp4','backend_arch.mp4',  262144000, 500.0,'completed','videos/vid_020.mp4','zips/vid_020.zip', 91750400, 15000,0,8, NOW()-INTERVAL '35 days', NOW()-INTERVAL '35 days'+INTERVAL '2 min', NOW()-INTERVAL '35 days'+INTERVAL '6 min', NOW()-INTERVAL '35 days'+INTERVAL '45 min'),
+      ('b1000000-0000-0000-0000-000000000021','a1000000-0000-0000-0000-000000000004','vid_021.mp4','microservices.mp4', 419430400, 780.0,'completed','videos/vid_021.mp4','zips/vid_021.zip',146800640, 23400,0,8, NOW()-INTERVAL '23 days', NOW()-INTERVAL '23 days'+INTERVAL '3 min', NOW()-INTERVAL '23 days'+INTERVAL '8 min', NOW()-INTERVAL '23 days'+INTERVAL '72 min'),
+      ('b1000000-0000-0000-0000-000000000022','a1000000-0000-0000-0000-000000000004','vid_022.mp4','database_tuning.mp4',104857600, 240.0,'failed',  'videos/vid_022.mp4', NULL,               NULL,      NULL, 3,7, NOW()-INTERVAL '9 days',  NOW()-INTERVAL '9 days' +INTERVAL '2 min', NOW()-INTERVAL '9 days' +INTERVAL '4 min', NULL),
+      ('b1000000-0000-0000-0000-000000000023','a1000000-0000-0000-0000-000000000004','vid_023.mp4','docker_adv.mp4',     68157440,  160.0,'processing','videos/vid_023.mp4', NULL,               NULL,      NULL, 0,6, NOW()-INTERVAL '20 minutes', NOW()-INTERVAL '15 minutes', NOW()-INTERVAL '5 minutes', NULL),
+      -- Felipe: 5 vídeos
+      ('b1000000-0000-0000-0000-000000000024','a1000000-0000-0000-0000-000000000006','vid_024.mp4','go_lang_intro.mp4',  36700160,   85.0,'completed','videos/vid_024.mp4','zips/vid_024.zip', 12845056, 2550, 0,5, NOW()-INTERVAL '18 days', NOW()-INTERVAL '18 days'+INTERVAL '1 min', NOW()-INTERVAL '18 days'+INTERVAL '2 min', NOW()-INTERVAL '18 days'+INTERVAL '7 min'),
+      ('b1000000-0000-0000-0000-000000000025','a1000000-0000-0000-0000-000000000006','vid_025.mp4','react_hooks.mp4',    83886080,  190.0,'completed','videos/vid_025.mp4','zips/vid_025.zip', 29360128, 5700, 0,5, NOW()-INTERVAL '13 days', NOW()-INTERVAL '13 days'+INTERVAL '1 min', NOW()-INTERVAL '13 days'+INTERVAL '3 min', NOW()-INTERVAL '13 days'+INTERVAL '14 min'),
+      ('b1000000-0000-0000-0000-000000000026','a1000000-0000-0000-0000-000000000006','vid_026.mp4','node_streams.mp4',  209715200, 420.0,'completed','videos/vid_026.mp4','zips/vid_026.zip', 73400320, 12600,0,6, NOW()-INTERVAL '6 days',  NOW()-INTERVAL '6 days' +INTERVAL '2 min', NOW()-INTERVAL '6 days' +INTERVAL '5 min', NOW()-INTERVAL '6 days' +INTERVAL '36 min'),
+      ('b1000000-0000-0000-0000-000000000027','a1000000-0000-0000-0000-000000000006','vid_027.mp4','typescript_tips.mp4', 52428800, 120.0,'queued',   'videos/vid_027.mp4', NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '3 hours', NOW()-INTERVAL '2 hours', NULL, NULL),
+      ('b1000000-0000-0000-0000-000000000028','a1000000-0000-0000-0000-000000000006','vid_028.mp4','aws_lambda.mp4',    104857600, 240.0,'pending',  NULL,                 NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '15 minutes', NULL, NULL, NULL),
+      -- Gabriela: 4 vídeos (usuária nova)
+      ('b1000000-0000-0000-0000-000000000029','a1000000-0000-0000-0000-000000000007','vid_029.mp4','onboarding_v1.mp4',  26214400,   60.0,'completed','videos/vid_029.mp4','zips/vid_029.zip',  9175040, 1800, 0,5, NOW()-INTERVAL '14 days', NOW()-INTERVAL '14 days'+INTERVAL '1 min', NOW()-INTERVAL '14 days'+INTERVAL '2 min', NOW()-INTERVAL '14 days'+INTERVAL '5 min'),
+      ('b1000000-0000-0000-0000-000000000030','a1000000-0000-0000-0000-000000000007','vid_030.mp4','produto_tour.mp4',   73400320,  175.0,'completed','videos/vid_030.mp4','zips/vid_030.zip', 25690112, 5250, 0,5, NOW()-INTERVAL '10 days', NOW()-INTERVAL '10 days'+INTERVAL '1 min', NOW()-INTERVAL '10 days'+INTERVAL '2 min', NOW()-INTERVAL '10 days'+INTERVAL '13 min'),
+      ('b1000000-0000-0000-0000-000000000031','a1000000-0000-0000-0000-000000000007','vid_031.mp4','demo_v2.mp4',        47185920,  110.0,'processing','videos/vid_031.mp4', NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '45 minutes', NOW()-INTERVAL '40 minutes', NOW()-INTERVAL '15 minutes', NULL),
+      ('b1000000-0000-0000-0000-000000000032','a1000000-0000-0000-0000-000000000007','vid_032.mp4','tour_features.mp4',  15728640,   35.0,'pending',  NULL,                 NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '2 minutes', NULL, NULL, NULL),
+      -- João: 3 vídeos (usuário mais novo)
+      ('b1000000-0000-0000-0000-000000000033','a1000000-0000-0000-0000-000000000010','vid_033.mp4','intro_projeto.mp4',  20971520,   45.0,'completed','videos/vid_033.mp4','zips/vid_033.zip',  7340032, 1350, 0,5, NOW()-INTERVAL '4 days',  NOW()-INTERVAL '4 days' +INTERVAL '1 min', NOW()-INTERVAL '4 days' +INTERVAL '2 min', NOW()-INTERVAL '4 days' +INTERVAL '4 min'),
+      ('b1000000-0000-0000-0000-000000000034','a1000000-0000-0000-0000-000000000010','vid_034.mp4','setup_ambiente.mp4', 52428800,  120.0,'queued',   'videos/vid_034.mp4', NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '1 hour',  NOW()-INTERVAL '50 minutes', NULL, NULL),
+      ('b1000000-0000-0000-0000-000000000035','a1000000-0000-0000-0000-000000000010','vid_035.mp4','primeiro_deploy.mp4',31457280,   70.0,'pending',  NULL,                 NULL,               NULL,      NULL, 0,5, NOW()-INTERVAL '5 minutes', NULL, NULL, NULL);
+    EOSQL
+
+    # ─── PROCESSING DB: processing_jobs ──────────────────────────────────────
+    psql -h postgres -U postgres -d processing_db <<'EOSQL'
+    INSERT INTO processing_jobs (id, video_id, user_id, worker_id, status, started_at, completed_at, duration_seconds, error_message, retry_count, created_at) VALUES
+      ('c1000000-0000-0000-0000-000000000001','b1000000-0000-0000-0000-000000000001','a1000000-0000-0000-0000-000000000001','worker-1','completed', NOW()-INTERVAL '25 days'+INTERVAL '3 min', NOW()-INTERVAL '25 days'+INTERVAL '5 min',  120, NULL, 0, NOW()-INTERVAL '25 days'),
+      ('c1000000-0000-0000-0000-000000000002','b1000000-0000-0000-0000-000000000002','a1000000-0000-0000-0000-000000000001','worker-2','completed', NOW()-INTERVAL '20 days'+INTERVAL '4 min', NOW()-INTERVAL '20 days'+INTERVAL '12 min', 480, NULL, 0, NOW()-INTERVAL '20 days'),
+      ('c1000000-0000-0000-0000-000000000003','b1000000-0000-0000-0000-000000000003','a1000000-0000-0000-0000-000000000001','worker-1','completed', NOW()-INTERVAL '18 days'+INTERVAL '2 min', NOW()-INTERVAL '18 days'+INTERVAL '25 min',1380, NULL, 0, NOW()-INTERVAL '18 days'),
+      ('c1000000-0000-0000-0000-000000000004','b1000000-0000-0000-0000-000000000004','a1000000-0000-0000-0000-000000000001','worker-3','failed',    NOW()-INTERVAL '15 days'+INTERVAL '3 min', NULL,                                      NULL, 'ffmpeg: invalid codec for file format', 3, NOW()-INTERVAL '15 days'),
+      ('c1000000-0000-0000-0000-000000000005','b1000000-0000-0000-0000-000000000005','a1000000-0000-0000-0000-000000000001','worker-2','completed', NOW()-INTERVAL '10 days'+INTERVAL '5 min', NOW()-INTERVAL '10 days'+INTERVAL '55 min',3000, NULL, 0, NOW()-INTERVAL '10 days'),
+      ('c1000000-0000-0000-0000-000000000006','b1000000-0000-0000-0000-000000000006','a1000000-0000-0000-0000-000000000001','worker-1','completed', NOW()-INTERVAL '5 days' +INTERVAL '2 min', NOW()-INTERVAL '5 days' +INTERVAL '4 min',  90, NULL, 0, NOW()-INTERVAL '5 days'),
+      ('c1000000-0000-0000-0000-000000000007','b1000000-0000-0000-0000-000000000007','a1000000-0000-0000-0000-000000000001','worker-4','running',   NOW()-INTERVAL '10 minutes', NULL,                                                    NULL, NULL, 0, NOW()-INTERVAL '30 minutes'),
+      ('c1000000-0000-0000-0000-000000000008','b1000000-0000-0000-0000-000000000009','a1000000-0000-0000-0000-000000000002','worker-2','completed', NOW()-INTERVAL '22 days'+INTERVAL '3 min', NOW()-INTERVAL '22 days'+INTERVAL '10 min', 420, NULL, 0, NOW()-INTERVAL '22 days'),
+      ('c1000000-0000-0000-0000-000000000009','b1000000-0000-0000-0000-000000000010','a1000000-0000-0000-0000-000000000002','worker-3','completed', NOW()-INTERVAL '17 days'+INTERVAL '4 min', NOW()-INTERVAL '17 days'+INTERVAL '15 min', 660, NULL, 0, NOW()-INTERVAL '17 days'),
+      ('c1000000-0000-0000-0000-000000000010','b1000000-0000-0000-0000-000000000011','a1000000-0000-0000-0000-000000000002','worker-1','failed',    NOW()-INTERVAL '12 days'+INTERVAL '2 min', NULL,                                      NULL, 'out of memory during frame extraction', 2, NOW()-INTERVAL '12 days'),
+      ('c1000000-0000-0000-0000-000000000011','b1000000-0000-0000-0000-000000000012','a1000000-0000-0000-0000-000000000002','worker-2','completed', NOW()-INTERVAL '8 days' +INTERVAL '2 min', NOW()-INTERVAL '8 days' +INTERVAL '5 min',  180, NULL, 0, NOW()-INTERVAL '8 days'),
+      ('c1000000-0000-0000-0000-000000000012','b1000000-0000-0000-0000-000000000015','a1000000-0000-0000-0000-000000000003','worker-3','completed', NOW()-INTERVAL '28 days'+INTERVAL '2 min', NOW()-INTERVAL '28 days'+INTERVAL '13 min', 660, NULL, 0, NOW()-INTERVAL '28 days'),
+      ('c1000000-0000-0000-0000-000000000013','b1000000-0000-0000-0000-000000000016','a1000000-0000-0000-0000-000000000003','worker-4','completed', NOW()-INTERVAL '21 days'+INTERVAL '2 min', NOW()-INTERVAL '21 days'+INTERVAL '4 min',  120, NULL, 0, NOW()-INTERVAL '21 days'),
+      ('c1000000-0000-0000-0000-000000000014','b1000000-0000-0000-0000-000000000017','a1000000-0000-0000-0000-000000000003','worker-1','failed',    NOW()-INTERVAL '14 days'+INTERVAL '4 min', NULL,                                      NULL, 'corrupted video file: unexpected EOF', 1, NOW()-INTERVAL '14 days'),
+      ('c1000000-0000-0000-0000-000000000015','b1000000-0000-0000-0000-000000000018','a1000000-0000-0000-0000-000000000003','worker-2','completed', NOW()-INTERVAL '7 days' +INTERVAL '3 min', NOW()-INTERVAL '7 days' +INTERVAL '28 min',1500, NULL, 0, NOW()-INTERVAL '7 days'),
+      ('c1000000-0000-0000-0000-000000000016','b1000000-0000-0000-0000-000000000020','a1000000-0000-0000-0000-000000000004','worker-3','completed', NOW()-INTERVAL '35 days'+INTERVAL '6 min', NOW()-INTERVAL '35 days'+INTERVAL '45 min',2340, NULL, 0, NOW()-INTERVAL '35 days'),
+      ('c1000000-0000-0000-0000-000000000017','b1000000-0000-0000-0000-000000000021','a1000000-0000-0000-0000-000000000004','worker-4','completed', NOW()-INTERVAL '23 days'+INTERVAL '8 min', NOW()-INTERVAL '23 days'+INTERVAL '72 min',3840, NULL, 0, NOW()-INTERVAL '23 days'),
+      ('c1000000-0000-0000-0000-000000000018','b1000000-0000-0000-0000-000000000022','a1000000-0000-0000-0000-000000000004','worker-1','failed',    NOW()-INTERVAL '9 days' +INTERVAL '4 min', NULL,                                      NULL, 'timeout: processing exceeded 600s limit', 3, NOW()-INTERVAL '9 days'),
+      ('c1000000-0000-0000-0000-000000000019','b1000000-0000-0000-0000-000000000023','a1000000-0000-0000-0000-000000000004','worker-2','running',   NOW()-INTERVAL '5 minutes', NULL,                                                    NULL, NULL, 0, NOW()-INTERVAL '20 minutes'),
+      ('c1000000-0000-0000-0000-000000000020','b1000000-0000-0000-0000-000000000024','a1000000-0000-0000-0000-000000000006','worker-3','completed', NOW()-INTERVAL '18 days'+INTERVAL '2 min', NOW()-INTERVAL '18 days'+INTERVAL '7 min',  300, NULL, 0, NOW()-INTERVAL '18 days'),
+      ('c1000000-0000-0000-0000-000000000021','b1000000-0000-0000-0000-000000000025','a1000000-0000-0000-0000-000000000006','worker-4','completed', NOW()-INTERVAL '13 days'+INTERVAL '3 min', NOW()-INTERVAL '13 days'+INTERVAL '14 min', 660, NULL, 0, NOW()-INTERVAL '13 days'),
+      ('c1000000-0000-0000-0000-000000000022','b1000000-0000-0000-0000-000000000026','a1000000-0000-0000-0000-000000000006','worker-1','completed', NOW()-INTERVAL '6 days' +INTERVAL '5 min', NOW()-INTERVAL '6 days' +INTERVAL '36 min',1860, NULL, 0, NOW()-INTERVAL '6 days'),
+      ('c1000000-0000-0000-0000-000000000023','b1000000-0000-0000-0000-000000000029','a1000000-0000-0000-0000-000000000007','worker-2','completed', NOW()-INTERVAL '14 days'+INTERVAL '2 min', NOW()-INTERVAL '14 days'+INTERVAL '5 min',  180, NULL, 0, NOW()-INTERVAL '14 days'),
+      ('c1000000-0000-0000-0000-000000000024','b1000000-0000-0000-0000-000000000030','a1000000-0000-0000-0000-000000000007','worker-3','completed', NOW()-INTERVAL '10 days'+INTERVAL '2 min', NOW()-INTERVAL '10 days'+INTERVAL '13 min', 660, NULL, 0, NOW()-INTERVAL '10 days'),
+      ('c1000000-0000-0000-0000-000000000025','b1000000-0000-0000-0000-000000000031','a1000000-0000-0000-0000-000000000007','worker-4','running',   NOW()-INTERVAL '15 minutes', NULL,                                                   NULL, NULL, 0, NOW()-INTERVAL '45 minutes'),
+      ('c1000000-0000-0000-0000-000000000026','b1000000-0000-0000-0000-000000000033','a1000000-0000-0000-0000-000000000010','worker-1','completed', NOW()-INTERVAL '4 days' +INTERVAL '2 min', NOW()-INTERVAL '4 days' +INTERVAL '4 min',  120, NULL, 0, NOW()-INTERVAL '4 days');
+
+    INSERT INTO system_metrics (metric_name, metric_value, labels, recorded_at) VALUES
+      ('videos_processed_total',  26, '{"status":"completed"}', NOW()-INTERVAL '1 hour'),
+      ('videos_failed_total',      7, '{"status":"failed"}',    NOW()-INTERVAL '1 hour'),
+      ('avg_processing_seconds', 842, '{"period":"day"}',       NOW()-INTERVAL '1 hour'),
+      ('queue_depth',              5, '{"queue":"video_processing"}', NOW()-INTERVAL '30 minutes'),
+      ('active_workers',           3, '{"pool":"default"}',     NOW()-INTERVAL '5 minutes'),
+      ('videos_processed_total',  19, '{"status":"completed"}', NOW()-INTERVAL '25 hours'),
+      ('videos_failed_total',      4, '{"status":"failed"}',    NOW()-INTERVAL '25 hours'),
+      ('avg_processing_seconds', 790, '{"period":"day"}',       NOW()-INTERVAL '25 hours');
+    EOSQL
+
+    # ─── NOTIFICATION DB: notifications ──────────────────────────────────────
+    psql -h postgres -U postgres -d notification_db <<'EOSQL'
+    INSERT INTO notifications (user_id, video_id, type, status, subject, message, recipient, sent_at, error_message, retry_count, created_at) VALUES
+      ('a1000000-0000-0000-0000-000000000001','b1000000-0000-0000-0000-000000000001','email','sent',   'Processamento concluído','Seu vídeo reuniao_sprint.mp4 foi processado com sucesso. 3613 frames extraídos.', 'ana.souza@email.com',    NOW()-INTERVAL '25 days'+INTERVAL '5 min', NULL, 0, NOW()-INTERVAL '25 days'+INTERVAL '5 min'),
+      ('a1000000-0000-0000-0000-000000000001','b1000000-0000-0000-0000-000000000002','email','sent',   'Processamento concluído','Seu vídeo demo_produto.mp4 foi processado com sucesso. 7200 frames extraídos.',    'ana.souza@email.com',    NOW()-INTERVAL '20 days'+INTERVAL '12 min', NULL, 0, NOW()-INTERVAL '20 days'+INTERVAL '12 min'),
+      ('a1000000-0000-0000-0000-000000000001','b1000000-0000-0000-0000-000000000004','email','sent',   'Falha no processamento', 'Não foi possível processar entrevista.mp4. Erro: invalid codec.',                   'ana.souza@email.com',    NOW()-INTERVAL '15 days'+INTERVAL '10 min', NULL, 0, NOW()-INTERVAL '15 days'+INTERVAL '10 min'),
+      ('a1000000-0000-0000-0000-000000000001','b1000000-0000-0000-0000-000000000005','email','sent',   'Processamento concluído','Seu vídeo webinar_jan.mp4 foi processado com sucesso. 27000 frames extraídos.',    'ana.souza@email.com',    NOW()-INTERVAL '10 days'+INTERVAL '55 min', NULL, 0, NOW()-INTERVAL '10 days'+INTERVAL '55 min'),
+      ('a1000000-0000-0000-0000-000000000002','b1000000-0000-0000-0000-000000000009','email','sent',   'Processamento concluído','Seu vídeo apresentacao.mp4 foi processado com sucesso. 4500 frames extraídos.',    'carlos.lima@email.com',  NOW()-INTERVAL '22 days'+INTERVAL '10 min', NULL, 0, NOW()-INTERVAL '22 days'+INTERVAL '10 min'),
+      ('a1000000-0000-0000-0000-000000000002','b1000000-0000-0000-0000-000000000011','email','sent',   'Falha no processamento', 'Não foi possível processar review_code.mp4. Erro: out of memory.',                  'carlos.lima@email.com',  NOW()-INTERVAL '12 days'+INTERVAL '8 min', NULL, 0, NOW()-INTERVAL '12 days'+INTERVAL '8 min'),
+      ('a1000000-0000-0000-0000-000000000003','b1000000-0000-0000-0000-000000000015','email','sent',   'Processamento concluído','Seu vídeo ux_research.mp4 foi processado com sucesso. 5250 frames extraídos.',     'beatriz.costa@email.com',NOW()-INTERVAL '28 days'+INTERVAL '13 min', NULL, 0, NOW()-INTERVAL '28 days'+INTERVAL '13 min'),
+      ('a1000000-0000-0000-0000-000000000003','b1000000-0000-0000-0000-000000000017','email','sent',   'Falha no processamento', 'Não foi possível processar usability_test.mp4. Erro: corrupted file.',              'beatriz.costa@email.com',NOW()-INTERVAL '14 days'+INTERVAL '15 min', NULL, 0, NOW()-INTERVAL '14 days'+INTERVAL '15 min'),
+      ('a1000000-0000-0000-0000-000000000004','b1000000-0000-0000-0000-000000000020','email','sent',   'Processamento concluído','Seu vídeo backend_arch.mp4 foi processado com sucesso. 15000 frames extraídos.',   'diego.farias@email.com', NOW()-INTERVAL '35 days'+INTERVAL '45 min', NULL, 0, NOW()-INTERVAL '35 days'+INTERVAL '45 min'),
+      ('a1000000-0000-0000-0000-000000000004','b1000000-0000-0000-0000-000000000022','email','sent',   'Falha no processamento', 'Não foi possível processar database_tuning.mp4. Erro: timeout.',                   'diego.farias@email.com', NOW()-INTERVAL '9 days' +INTERVAL '10 min', NULL, 0, NOW()-INTERVAL '9 days'+INTERVAL '10 min'),
+      ('a1000000-0000-0000-0000-000000000006','b1000000-0000-0000-0000-000000000024','email','sent',   'Processamento concluído','Seu vídeo go_lang_intro.mp4 foi processado com sucesso. 2550 frames extraídos.',   'felipe.nunes@email.com', NOW()-INTERVAL '18 days'+INTERVAL '7 min', NULL, 0, NOW()-INTERVAL '18 days'+INTERVAL '7 min'),
+      ('a1000000-0000-0000-0000-000000000006','b1000000-0000-0000-0000-000000000025','email','sent',   'Processamento concluído','Seu vídeo react_hooks.mp4 foi processado com sucesso. 5700 frames extraídos.',     'felipe.nunes@email.com', NOW()-INTERVAL '13 days'+INTERVAL '14 min', NULL, 0, NOW()-INTERVAL '13 days'+INTERVAL '14 min'),
+      ('a1000000-0000-0000-0000-000000000007','b1000000-0000-0000-0000-000000000029','email','sent',   'Processamento concluído','Seu vídeo onboarding_v1.mp4 foi processado com sucesso. 1800 frames extraídos.',   'gabi.rocha@email.com',   NOW()-INTERVAL '14 days'+INTERVAL '5 min', NULL, 0, NOW()-INTERVAL '14 days'+INTERVAL '5 min'),
+      ('a1000000-0000-0000-0000-000000000010','b1000000-0000-0000-0000-000000000033','email','sent',   'Processamento concluído','Seu vídeo intro_projeto.mp4 foi processado com sucesso. 1350 frames extraídos.',   'joao.mendes@email.com',  NOW()-INTERVAL '4 days' +INTERVAL '4 min', NULL, 0, NOW()-INTERVAL '4 days'+INTERVAL '4 min'),
+      ('a1000000-0000-0000-0000-000000000001','b1000000-0000-0000-0000-000000000003','email','failed', 'Processamento concluído','Seu vídeo treinamento.mp4 foi processado com sucesso.',                             'ana.souza@email.com',    NULL, 'SMTP connection refused', 1, NOW()-INTERVAL '18 days'+INTERVAL '25 min');
+    EOSQL
+
+    echo "Seed concluído com sucesso!"
+    echo "  - 10 usuários criados (auth_db)"
+    echo "  - 35 vídeos criados (video_db)"
+    echo "  - 26 jobs de processamento criados (processing_db)"
+    echo "  - 15 notificações criadas (notification_db)"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: metabase-seed
+  namespace: g57
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              value: postgres123
+          command: ["/bin/sh", "/scripts/seed.sh"]
+          volumeMounts:
+            - name: seed-scripts
+              mountPath: /scripts
+      volumes:
+        - name: seed-scripts
+          configMap:
+            name: metabase-seed-scripts
+            defaultMode: 0755

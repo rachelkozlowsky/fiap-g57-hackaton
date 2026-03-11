@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: g57
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: notification-db-password
+          command:
+            - sh
+            - -c
+            - |
+              until psql -h postgres -U notification_user -d notification_db -c "SELECT 1" > /dev/null 2>&1; do
+                echo "Aguardando banco de dados notification_db estar totalmente pronto..."
+                sleep 2
+              done
+              echo "Banco pronto! Limpando possível estado dirty de tentativas anteriores..."
+              psql -h postgres -U notification_user -d notification_db -c "UPDATE schema_migrations SET dirty = false WHERE version = 1;" || true
+      containers:
+        - name: notification-service
+          image: g57-notification-service:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-host
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: postgres-port
+            - name: DB_NAME
+              value: notification_db
+            - name: DB_USER
+              value: notification_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: notification-db-password
+            - name: RABBITMQ_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: rabbitmq-url
+            - name: SMTP_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: smtp-host
+            - name: SMTP_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: smtp-port
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: smtp-user
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: g57-secrets
+                  key: smtp-password
+            - name: SMTP_FROM
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: smtp-from
+            - name: NOTIFICATION_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: g57-config
+                  key: notification-queue
+            - name: AUTH_SERVICE_URL
+              value: http://auth-service:8081
+            - name: VIDEO_SERVICE_URL
+              value: http://video-service:8082
+          ports:
+            - containerPort: 8091
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: g57
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - protocol: TCP
+      port: 8091
+      targetPort: 8091
